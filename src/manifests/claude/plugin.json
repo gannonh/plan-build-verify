@@ -1,0 +1,31 @@
+{
+  "name": "plan-build-verify",
+  "displayName": "Plan Build Verify",
+  "version": "0.1.0",
+  "description": "Plan, Build, and Verify as a product OS. Specs live as GitHub Issues.",
+  "author": {
+    "name": "Gannon Hall",
+    "email": "gannonhall@gmail.com"
+  },
+  "homepage": "https://github.com/gannonh/plan-build-verify",
+  "repository": "https://github.com/gannonh/plan-build-verify",
+  "license": "MIT",
+  "keywords": [
+    "plan",
+    "build",
+    "verify",
+    "github-issues",
+    "specs"
+  ],
+  "skills": "./skills/",
+  "agents": [
+    "./agents/plan-agent.md",
+    "./agents/build-agent.md",
+    "./agents/verify-agent.md"
+  ],
+  "commands": [
+    "./commands/plan.md",
+    "./commands/build.md",
+    "./commands/verify.md"
+  ]
+}

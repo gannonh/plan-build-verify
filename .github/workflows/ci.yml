@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  prove-trees:
+    name: Prove generated plugin trees
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Python test tools
+        run: python3 -m pip install --upgrade pip && python3 -m pip install -r requirements-dev.txt
+
+      - name: Build plugin trees
+        run: python3 scripts/build.py
+
+      - name: Check generated trees
+        run: python3 scripts/check.py
+
+      - name: Run unit tests
+        run: python3 -m pytest
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Validate Claude plugin
+        run: claude plugin validate ./plugins/claude --strict
