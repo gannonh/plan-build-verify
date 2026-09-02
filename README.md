@@ -8,6 +8,14 @@ pstack stays a separate Cursor plugin. This plugin owns specs, labels, and Plan 
 
 ## Install
 
+Public Cursor Marketplace and Claude plugin directory listings are not live. Listing copy is in [docs/marketplace-listings.md](docs/marketplace-listings.md) and on [issue #6](https://github.com/gannonh/plan-build-verify/issues/6). The Anysphere and Claude forms still need a human account.
+
+Listing submitted. Listings are not public yet.
+
+Cursor listing URL: _submitted, not public yet_
+
+Claude listing URL: _submitted, not public yet_
+
 ### Cursor
 
 Copy the generated Cursor tree into the local plugin directory:
@@ -36,7 +44,7 @@ codex plugin marketplace add gannonh/plan-build-verify
 codex plugin add plan-build-verify@plan-build-verify
 ```
 
-Codex binds `.agents/plugins/marketplace.json` first, so the installed tree is `plugins/codex`. That tree ships skills `plan`, `build`, `verify`, `triage`, and `ship`. It has no `agents/` or `commands/` directory.
+Codex binds `.agents/plugins/marketplace.json` first, so the installed tree is `plugins/codex`. That tree ships skills `plan`, `build`, `verify`, `triage`, and `ship`. It has no `agents/` or `commands/` directory. v1 has no Codex public-directory listing.
 
 If a sparse checkout is used, it must be:
 
