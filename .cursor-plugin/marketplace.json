@@ -1,0 +1,17 @@
+{
+  "name": "plan-build-verify",
+  "owner": {
+    "name": "Gannon Hall",
+    "email": "gannonhall@gmail.com"
+  },
+  "metadata": {
+    "description": "Plan, Build, and Verify as a product OS. Specs live as GitHub Issues."
+  },
+  "plugins": [
+    {
+      "name": "plan-build-verify",
+      "source": "plugins/cursor",
+      "description": "Plan, Build, and Verify as a product OS. Specs live as GitHub Issues."
+    }
+  ]
+}
