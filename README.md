@@ -6,6 +6,8 @@ Epic: [Install plan-build-verify as a Cursor, Claude, and Codex plugin](https://
 
 pstack stays a separate Cursor plugin. This plugin owns specs, labels, and Plan / Build / Verify.
 
+Cursor and Claude marketplace listings are submitted but not public yet. Use the install steps below until live listing URLs are available.
+
 ## Install
 
 ### Cursor
