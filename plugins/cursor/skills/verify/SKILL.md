@@ -27,7 +27,7 @@ User-acceptance evidence:
 3. Use scripts under `scripts/user-acceptance/`.
 4. Do not generate a verification skill during Verify.
 
-Review-thread inventory uses the sibling `address-pr-comments` skill in this plugin. If that skill is not available, read threads with `gh api graphql` as described in `references/verify.md`.
+Landing the PR uses the sibling `ship` skill. Ship owns settled-red CI and unanswered review comments. It calls `npx agent-reviews` to list, filter, reply, and watch. Do not paginate review comments with raw `gh`.
 
 Hard gates:
 

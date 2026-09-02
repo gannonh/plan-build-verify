@@ -16,7 +16,7 @@ Copy the generated Cursor tree into the local plugin directory:
 cp -R plugins/cursor ~/.cursor/plugins/local/plan-build-verify
 ```
 
-Enable **Allow Local Plugin Imports**, then enable `plan-build-verify`. The plugin details should list skills `plan`, `build`, and `verify` plus agents `plan-agent`, `build-agent`, and `verify-agent`. Commands `/plan`, `/build`, and `/verify` load the matching skill.
+Enable **Allow Local Plugin Imports**, then enable `plan-build-verify`. The plugin details should list skills `plan`, `build`, `verify`, `triage`, and `ship` plus agents `plan-agent`, `build-agent`, and `verify-agent`. Commands `/plan`, `/build`, and `/verify` load the matching skill.
 
 Team marketplace import is Teams/Enterprise only and is not the Verify gate.
 
@@ -27,7 +27,7 @@ Team marketplace import is Teams/Enterprise only and is not the Verify gate.
 /plugin install plan-build-verify@plan-build-verify
 ```
 
-Claude should surface the same three skills and three agents. `/plan`, `/build`, and `/verify` load the matching skill.
+Claude should surface the same five skills and three agents. `/plan`, `/build`, and `/verify` load the matching skill.
 
 ### Codex
 
@@ -36,7 +36,7 @@ codex plugin marketplace add gannonh/plan-build-verify
 codex plugin add plan-build-verify@plan-build-verify
 ```
 
-Codex binds `.agents/plugins/marketplace.json` first, so the installed tree is `plugins/codex`. That tree ships skills `plan`, `build`, `verify`, `triage`, and `address-pr-comments`. It has no `agents/` or `commands/` directory.
+Codex binds `.agents/plugins/marketplace.json` first, so the installed tree is `plugins/codex`. That tree ships skills `plan`, `build`, `verify`, `triage`, and `ship`. It has no `agents/` or `commands/` directory.
 
 If a sparse checkout is used, it must be:
 
@@ -45,6 +45,10 @@ If a sparse checkout is used, it must be:
 ```
 
 Do not use `--sparse .agents/plugins` alone. That omits `plugins/codex`.
+
+## Runtime dependency
+
+The `ship` skill lands a PR. It calls [`npx agent-reviews`](https://github.com/pbakaus/agent-reviews) to list, filter, reply, and watch review comments (human and bot). Node.js 18+ is required at runtime. This repository does not vendor `agent-reviews` and does not add it to a package.json. `npx` fetches the published CLI when the skill runs.
 
 ## Build
 

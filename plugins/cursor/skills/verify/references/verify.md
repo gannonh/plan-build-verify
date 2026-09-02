@@ -126,94 +126,17 @@ The PR body must contain:
 
 If the repo merges without PRs, skip this step and Step 7, and say so.
 
-## Step 7: Converge CI and review feedback
+## Step 7: Land the PR
 
-This is the autonomous loop. It runs until the exit condition, without asking permission between iterations.
+Load the sibling `ship` skill and follow it. Ship owns landing. That means settled-red CI and unanswered review comments from humans and bots.
 
-### Loop
+Ship calls `npx agent-reviews` ([pbakaus/agent-reviews](https://github.com/pbakaus/agent-reviews)) to list, filter, reply, and watch. That CLI is a runtime dependency. Do not vendor it. Do not add it to a package.json. Do not paginate review comments with raw `gh`.
 
-1. **Snapshot** PR, CI, and review state:
-
-```bash
-gh pr view --json number,headRefOid,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup
-gh pr checks --required --watch --fail-fast
-```
-
-`gh pr checks --watch` blocks until the checks finish and exits non-zero when one fails, so it is the wait itself, not a poll you have to schedule. Keep consuming its output in the same turn. Never background it and end the turn as if the work were done. Drop `--required` when the repo marks nothing as required.
-
-2. **Review feedback first**, before CI reruns. A review fix produces a new commit that retriggers CI anyway, so fixing flakes on a SHA you are about to replace is wasted work.
-
- Build a ledger before editing anything. Enumerate every published review item, group related comments into issue candidates, and record `id`, `source` (author, path, line, thread URL), `reviewer ask`, `classification`, `evidence`, `action`, `disposition`.
-
- Follow `<path-to-skills-directory>/address-pr-comments/SKILL.md` for this step. It already runs autonomously and its comment-fetching script returns full thread state including resolved and outdated flags, which `gh pr view` does not expose. If that skill is not installed, read threads directly:
-
-```bash
-gh api graphql -f query='
-  query($owner:String!,$repo:String!,$pr:Int!){
-    repository(owner:$owner,name:$repo){
-      pullRequest(number:$pr){
-        reviewThreads(first:100){ nodes{
-          id isResolved isOutdated
-          comments(first:50){ nodes{ author{login} body path line url } }
-        }}
-      }
-    }
-  }' -F owner=<owner> -F repo=<repo> -F pr=<number>
-```
-
- Classify each candidate against the **current** code, not the diff the reviewer saw: `fix`, `already-addressed`, `false-positive`, `question`, or `unsafe-to-change`. Every classification needs evidence.
-
- - `fix`: patch it, add a regression test when the comment describes recurring behavior, validate, commit, push, then reply and resolve the thread.
- - `already-addressed`, `false-positive`, `unsafe-to-change`: do not change code. Reply with the evidence-backed rationale and resolve.
- - `question`: answer it from the code and resolve.
-
- Reply to every thread you act on, human or bot, prefixed `[agent]` so authorship is unambiguous. Ignore reviews still in GitHub's `PENDING` state.
-
- **Never silently drop a review item.** A comment you decline still needs a posted rationale, or the PR looks ignored.
-
-3. **Diagnose CI failures.** Read the logs before deciding anything:
-
-```bash
-gh run view <run-id> --log-failed
-gh api repos/<owner>/<repo>/actions/jobs/<job-id>/logs    # single job, before the run finishes
-```
-
- Classify branch-related versus flaky or infrastructural:
-
- - **Branch-related** — compile, test, lint, typecheck, or snapshot failures in code this branch touched. Fix, validate locally, commit, push.
- - **Flaky or infrastructural** — timeouts, runner provisioning, registry or network outages, Actions infra errors. Rerun, up to 3 attempts:
-
-```bash
-gh run rerun <run-id> --failed
-```
-
- Do not edit tests, CI configuration, or dependency pins to make an unrelated failure disappear. That converts a red build into a hidden defect. If classification is ambiguous, diagnose manually once before rerunning.
-
- `gh run view --log-failed` is scoped to the whole run and may not expose logs until the run completes. If a single job has already failed while the run is still going, pull that job's logs directly rather than waiting.
-
-4. **Check mergeability.** Resolve merge conflicts against the base branch by rebasing or merging, per repo convention.
-
-5. **Re-enter the loop on the new SHA** after any push or rerun. Return to step 1 in the same turn.
-
-### Exit condition
-
-Exit only when all of these hold simultaneously on the **current head SHA**:
-
-- Every required check is green. Not pending, not queued, not skipped-because-cancelled.
-- Every review thread is resolved or has a posted reply.
-- No merge conflict.
-- The acceptance matrix has no `Fail` rows.
+After ship reports the PR is landed on the current head SHA, confirm the acceptance matrix still has no `Fail` rows, then continue to Step 8.
 
 A green snapshot while checks are still running is not an exit. Re-poll and confirm.
 
-### Abort condition
-
-Stop the loop and report when:
-
-- The flaky-retry budget (3) is exhausted on the same check.
-- CI fails for reasons outside the branch that you cannot fix, such as an expired secret, a permissions error, or a provider outage.
-- A reviewer asks for a change that contradicts the issue's acceptance criteria. That is a spec conflict: record it, stop, and return to Plan rather than quietly changing approved scope.
-- The same check fails 3 times after 3 distinct fix attempts. Report the diagnosis instead of thrashing.
+Stop the landing loop and report when ship aborts, or when a reviewer asks for a change that contradicts the issue's acceptance criteria. That is a spec conflict. Record it, stop, and return to Plan rather than quietly changing approved scope.
 
 ### Reporting cadence
 
@@ -305,7 +228,7 @@ These override the autonomy contract. Stop and hand back to the user when:
 - The branch has unrelated changes that make evidence unreliable.
 - The issue was already closed without a verification record.
 - A reviewer requests a change that contradicts approved acceptance criteria.
-- The convergence loop hit an abort condition in Step 7.
+- The landing loop in Step 7 hit a ship abort condition.
 - A fix would require force-pushing over commits you did not create, or otherwise rewriting shared history.
 
 Everything else is in scope to resolve without asking.
@@ -317,4 +240,5 @@ Everything else is in scope to resolve without asking.
 - Edit the wording of an acceptance criterion to make it pass.
 - Change tests, CI configuration, or dependency pins to hide an unrelated failure.
 - Drop a review comment without a posted disposition.
-- End the turn with the convergence loop unfinished and no abort condition reached.
+- Paginate review comments with raw `gh`. Use `npx agent-reviews` through the `ship` skill.
+- End the turn with the landing loop unfinished and no abort condition reached.

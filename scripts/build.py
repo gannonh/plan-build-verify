@@ -18,7 +18,7 @@ SKILLS = (
     "build",
     "verify",
     "triage",
-    "address-pr-comments",
+    "ship",
 )
 HOSTS = ("cursor", "claude", "codex")
 GENERATED_TREES = tuple(ROOT / "plugins" / host for host in HOSTS)

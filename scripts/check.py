@@ -17,7 +17,7 @@ SKILLS = (
     "build",
     "verify",
     "triage",
-    "address-pr-comments",
+    "ship",
 )
 HASHED_RELATIVE = (
     "SKILL.md",
@@ -161,6 +161,14 @@ def collect_errors(root: Path = ROOT, *, require_git_clean: bool = True) -> list
         if not tree.is_dir():
             errors.append(f"missing plugins/{host}")
             continue
+        skills_root = tree / "skills"
+        if skills_root.is_dir():
+            observed = sorted(p.name for p in skills_root.iterdir() if p.is_dir())
+            expected = sorted(SKILLS)
+            if observed != expected:
+                errors.append(
+                    f"plugins/{host}/skills must be {', '.join(expected)}; found {', '.join(observed) or '(none)'}"
+                )
         for skill in SKILLS:
             skill_dir = tree / "skills" / skill
             if not skill_dir.is_dir():

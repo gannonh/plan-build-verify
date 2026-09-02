@@ -1,6 +1,6 @@
 # GitHub Conventions
 
-Shared contract for every mode of this skill. Read this file completely before Plan, Build, Verify, Triage, or Migrate.
+Shared contract for every mode of this skill. Read this file completely before Plan, Build, Verify, Triage, Ship, or Migrate.
 
 ## Core rule
 
@@ -28,7 +28,8 @@ Rules:
 - Do not invent a second issue tracker. Do not create or maintain product specs under `docs/specs/` except the migration index/archive this skill leaves after Migrate. Temporary body files only, then delete them after the `gh` write.
 - OKF is retired. Do not run `okf init`, `okf update`, or finalize's OKF documentation step as a roadmap writer or as docs-as-spec. Do not present OKF as a live alternative.
 - Do not use `kata-linear` as the work-item lifecycle in those four repos. It is for Linear-first projects only.
-- Install this plugin for product delivery. It ships `plan`, `build`, `verify`, `triage`, and `address-pr-comments`. Do not install `ps`, `okf`, or `kata-linear`. Do not npx-add `plan-build-verify` from `gannonh/skills`. Never `npx skills add -g`.
+- Install this plugin for product delivery. It ships `plan`, `build`, `verify`, `triage`, and `ship`. Do not install `ps`, `okf`, or `kata-linear`. Do not npx-add `plan-build-verify` from `gannonh/skills`. Never `npx skills add -g`.
+- `ship` calls `npx agent-reviews` ([pbakaus/agent-reviews](https://github.com/pbakaus/agent-reviews)) at runtime to list, filter, reply, and watch review comments. That CLI is a runtime dependency. Do not vendor it. Do not add it to a package.json. Do not paginate review comments with raw `gh`.
 
 ### Install this plugin
 
