@@ -1,0 +1,464 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any
+
+
+SKILL_HOSTS = ("cursor", "claude", "codex")
+EVIDENCE_REL = Path("uat-evidence") / "verify-plan-build-verify"
+
+
+def repo_root() -> Path:
+    here = Path(__file__).resolve()
+    for path in [here.parent, *here.parents]:
+        if (path / "scripts" / "build.py").is_file():
+            return path
+    raise SystemExit("could not find scripts/build.py above this helper")
+
+
+def load_check(root: Path) -> Any:
+    path = root / "scripts" / "check.py"
+    spec = importlib.util.spec_from_file_location("pbv_check", path)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@dataclass(frozen=True)
+class Run:
+    run_id: str
+    repo: str
+    root: str
+    home: str
+    evidence: str
+    cursor_install: str
+    claude_install: str
+    codex_install: str
+    version: str
+
+    @property
+    def repo_path(self) -> Path:
+        return Path(self.repo)
+
+    @property
+    def root_path(self) -> Path:
+        return Path(self.root)
+
+    @property
+    def home_path(self) -> Path:
+        return Path(self.home)
+
+    @property
+    def evidence_path(self) -> Path:
+        return Path(self.evidence)
+
+    def install(self, host: str) -> Path:
+        return Path(getattr(self, f"{host}_install"))
+
+    def dump(self) -> dict[str, str]:
+        return asdict(self)
+
+
+def evidence_base(repo: Path) -> Path:
+    return repo / EVIDENCE_REL
+
+
+def run_json_path(root: Path) -> Path:
+    return root / "run.json"
+
+
+def write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
+
+
+def capture(cmd: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
+
+
+def format_proc(proc: subprocess.CompletedProcess[str], cmd: list[str]) -> str:
+    joined = " ".join(cmd)
+    return (
+        f"$ {joined}\n"
+        f"exit {proc.returncode}\n"
+        f"--- stdout ---\n{proc.stdout}"
+        f"--- stderr ---\n{proc.stderr}"
+    )
+
+
+def assert_under(path: Path, root: Path) -> None:
+    resolved = path.resolve()
+    base = root.resolve()
+    if resolved != base and base not in resolved.parents:
+        raise SystemExit(f"refusing path outside the run directory: {resolved}")
+
+
+def assert_not_operator_plugin(path: Path) -> None:
+    # ponytail: host CLIs ignore HOME and write ~/.cursor, ~/.claude, ~/.codex. Guard the live plugin dirs; a real host install under a fake HOME is the upgrade.
+    resolved = path.resolve()
+    markers = (
+        Path.home() / ".cursor" / "plugins" / "local" / "plan-build-verify",
+        Path.home() / ".claude" / "plugins",
+        Path.home() / ".codex" / "plugins",
+    )
+    for marker in markers:
+        target = marker.resolve()
+        if resolved == target or target in resolved.parents or resolved in target.parents:
+            raise SystemExit(f"refusing operator plugin path {target}")
+        prefix = str(target) + os.sep
+        if str(resolved).startswith(prefix):
+            raise SystemExit(f"refusing operator plugin path {target}")
+
+
+def plugin_version(repo: Path) -> str:
+    payload = json.loads((repo / "plugins" / "cursor" / ".cursor-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    version = payload.get("version")
+    if not isinstance(version, str) or not version:
+        raise SystemExit("plugins/cursor/.cursor-plugin/plugin.json is missing version")
+    return version
+
+
+def save_run(run: Run) -> None:
+    write_text(run_json_path(run.root_path), json.dumps(run.dump(), indent=2) + "\n")
+
+
+def load_run(root: Path) -> Run:
+    path = run_json_path(root)
+    if not path.is_file():
+        raise SystemExit(f"missing {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    required = {field for field in Run.__dataclass_fields__}
+    missing = required.difference(payload)
+    if missing:
+        raise SystemExit(f"{path} missing fields: {sorted(missing)}")
+    run = Run(**{field: str(payload[field]) for field in Run.__dataclass_fields__})
+    assert_under(run.home_path, run.root_path)
+    assert_not_operator_plugin(run.home_path)
+    for host in SKILL_HOSTS:
+        assert_under(run.install(host), run.home_path)
+        assert_not_operator_plugin(run.install(host))
+    return run
+
+
+def latest_run(base: Path) -> Run:
+    if not base.is_dir():
+        raise SystemExit(f"no verification runs under {base}")
+    candidates = sorted(
+        (path for path in base.iterdir() if path.is_dir() and run_json_path(path).is_file()),
+        key=lambda path: path.name,
+    )
+    if not candidates:
+        raise SystemExit(f"no verification runs under {base}")
+    return load_run(candidates[-1])
+
+
+def resolve_run(repo: Path, run_id: str | None) -> Run:
+    base = evidence_base(repo)
+    if run_id:
+        return load_run(base / run_id)
+    env_id = os.environ.get("VERIFY_PBV_RUN")
+    if env_id:
+        return load_run(base / env_id)
+    return latest_run(base)
+
+
+def copy_tree(source: Path, dest: Path) -> None:
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(source, dest)
+
+
+def cmd_launch(repo: Path) -> int:
+    run_id = time.strftime("%Y%m%dT%H%M%S") + f"-{os.getpid()}"
+    root = evidence_base(repo) / run_id
+    home = root / "home"
+    evidence = root / "evidence"
+    evidence.mkdir(parents=True)
+    home.mkdir(parents=True)
+
+    build = capture([sys.executable, "scripts/build.py"], cwd=repo)
+    write_text(evidence / "launch.log", format_proc(build, ["python3", "scripts/build.py"]))
+    if build.returncode != 0:
+        print(build.stderr, file=sys.stderr)
+        return build.returncode
+
+    version = plugin_version(repo)
+    cursor_install = home / ".cursor" / "plugins" / "local" / "plan-build-verify"
+    claude_install = (
+        home / ".claude" / "plugins" / "cache" / "plan-build-verify" / "plan-build-verify" / version
+    )
+    codex_install = (
+        home / ".codex" / "plugins" / "cache" / "plan-build-verify" / "plan-build-verify" / version
+    )
+    for dest in (cursor_install, claude_install, codex_install):
+        assert_under(dest, home)
+        assert_not_operator_plugin(dest)
+    copy_tree(repo / "plugins" / "cursor", cursor_install)
+    copy_tree(repo / "plugins" / "claude", claude_install)
+    copy_tree(repo / "plugins" / "codex", codex_install)
+
+    run = Run(
+        run_id=run_id,
+        repo=str(repo),
+        root=str(root),
+        home=str(home),
+        evidence=str(evidence),
+        cursor_install=str(cursor_install),
+        claude_install=str(claude_install),
+        codex_install=str(codex_install),
+        version=version,
+    )
+    save_run(run)
+    print(run_id)
+    print(root)
+    return 0
+
+
+def cmd_doctor(run: Run) -> int:
+    check = capture([sys.executable, "scripts/check.py"], cwd=run.repo_path)
+    write_text(run.evidence_path / "doctor-check.log", format_proc(check, ["python3", "scripts/check.py"]))
+    errors: list[str] = []
+    if check.returncode != 0:
+        errors.append("scripts/check.py failed")
+
+    check_mod = load_check(run.repo_path)
+    expected_skills = list(check_mod.SKILLS)
+    for host in SKILL_HOSTS:
+        install = run.install(host)
+        if not install.is_dir():
+            errors.append(f"missing {host} install at {install}")
+            continue
+        observed = sorted(path.name for path in (install / "skills").iterdir() if path.is_dir()) if (install / "skills").is_dir() else []
+        if observed != sorted(expected_skills):
+            errors.append(f"{host} skills {observed} != {expected_skills}")
+        manifest_dir = install / f".{host}-plugin"
+        if not (manifest_dir / "plugin.json").is_file():
+            errors.append(f"missing {host} plugin.json")
+        extra_manifests = [name for name in (".cursor-plugin", ".claude-plugin", ".codex-plugin") if name != f".{host}-plugin" and (install / name).exists()]
+        if extra_manifests:
+            errors.append(f"{host} install has extra manifests {extra_manifests}")
+
+    report = "ok\n" if not errors else "fail\n" + "\n".join(errors) + "\n"
+    write_text(run.evidence_path / "doctor.txt", report)
+    if errors:
+        print(report, file=sys.stderr)
+        return 1
+    print(f"ready {run.run_id} version {run.version}")
+    print(f"cursor {run.cursor_install}")
+    print(f"claude {run.claude_install}")
+    print(f"codex {run.codex_install}")
+    return 0
+
+
+def list_names(path: Path) -> list[str]:
+    if not path.is_dir():
+        return []
+    return sorted(entry.name for entry in path.iterdir())
+
+
+def write_listing(dest: Path, install: Path, host: str, *, agents: bool, commands: bool) -> None:
+    lines = [
+        f"install {install}",
+        f"skills {', '.join(list_names(install / 'skills'))}",
+        f"agents {', '.join(list_names(install / 'agents'))}" if agents else "agents (absent)",
+        f"commands {', '.join(list_names(install / 'commands'))}" if commands else "commands (absent)",
+        f"manifests {', '.join(name for name in list_names(install) if name.startswith('.'))}",
+    ]
+    write_text(dest, "\n".join(lines) + "\n")
+    plugin = install / f".{host}-plugin" / "plugin.json"
+    shutil.copy2(plugin, dest.parent / "plugin.json")
+
+
+def require_skills(install: Path, expected: list[str]) -> list[str]:
+    observed = list_names(install / "skills")
+    if observed != sorted(expected):
+        return [f"skills {observed} != {expected}"]
+    return []
+
+
+def require_agents(install: Path) -> list[str]:
+    expected = ["build-agent.md", "plan-agent.md", "verify-agent.md"]
+    observed = list_names(install / "agents")
+    if observed != expected:
+        return [f"agents {observed} != {expected}"]
+    return []
+
+
+def require_command_descriptions(install: Path, dest: Path, descriptions: dict[str, str]) -> list[str]:
+    errors: list[str] = []
+    dest.mkdir(parents=True, exist_ok=True)
+    for name, expected in descriptions.items():
+        path = install / "commands" / f"{name}.md"
+        if not path.is_file():
+            errors.append(f"missing commands/{name}.md")
+            continue
+        text = path.read_text(encoding="utf-8")
+        shutil.copy2(path, dest / path.name)
+        if f"description: {expected}" not in text:
+            errors.append(f"commands/{name}.md description must be {expected!r}")
+    return errors
+
+
+def drive_documented_build(run: Run, dest: Path) -> list[str]:
+    errors: list[str] = []
+    log = (run.evidence_path / "launch.log").read_text(encoding="utf-8")
+    write_text(dest / "launch.log", log)
+    for needle in (
+        "wrote plugins/cursor, plugins/claude, plugins/codex",
+        "wrote .cursor-plugin/marketplace.json",
+        "wrote .claude-plugin/marketplace.json",
+        "wrote .agents/plugins/marketplace.json",
+    ):
+        if needle not in log:
+            errors.append(f"launch log missing {needle!r}")
+    repo = run.repo_path
+    for rel in (
+        "plugins/cursor/.cursor-plugin/plugin.json",
+        "plugins/claude/.claude-plugin/plugin.json",
+        "plugins/codex/.codex-plugin/plugin.json",
+        ".cursor-plugin/marketplace.json",
+        ".claude-plugin/marketplace.json",
+        ".agents/plugins/marketplace.json",
+    ):
+        if not (repo / rel).is_file():
+            errors.append(f"missing {rel}")
+    return errors
+
+
+def drive_cursor(run: Run, dest: Path) -> list[str]:
+    check_mod = load_check(run.repo_path)
+    install = run.install("cursor")
+    write_listing(dest / "listing.txt", install, "cursor", agents=True, commands=True)
+    errors = require_skills(install, list(check_mod.SKILLS))
+    errors.extend(require_agents(install))
+    errors.extend(require_command_descriptions(install, dest / "commands", check_mod.COMMAND_DESCRIPTIONS))
+    if (install / "hooks").exists():
+        errors.append("cursor install has hooks/")
+    for name in ("mcp.json", ".mcp.json"):
+        if (install / name).exists():
+            errors.append(f"cursor install has {name}")
+    for name in (".claude-plugin", ".codex-plugin"):
+        if (install / name).exists():
+            errors.append(f"cursor install has {name}/")
+    return errors
+
+
+def drive_claude(run: Run, dest: Path) -> list[str]:
+    check_mod = load_check(run.repo_path)
+    install = run.install("claude")
+    write_listing(dest / "listing.txt", install, "claude", agents=True, commands=True)
+    errors = require_skills(install, list(check_mod.SKILLS))
+    errors.extend(require_agents(install))
+    errors.extend(require_command_descriptions(install, dest / "commands", check_mod.COMMAND_DESCRIPTIONS))
+    if (install / ".cursor-plugin").exists() or (install / ".codex-plugin").exists():
+        errors.append("claude install has the wrong host plugin.json directory")
+    claude_bin = shutil.which("claude")
+    if claude_bin is None:
+        write_text(dest / "validate.log", "claude CLI not on PATH\n")
+        errors.append("claude CLI not on PATH")
+        return errors
+    proc = capture([claude_bin, "plugin", "validate", str(install), "--strict"], cwd=run.repo_path)
+    write_text(dest / "validate.log", format_proc(proc, [claude_bin, "plugin", "validate", str(install), "--strict"]))
+    if proc.returncode != 0:
+        errors.append("claude plugin validate --strict failed")
+    return errors
+
+
+def drive_codex(run: Run, dest: Path) -> list[str]:
+    check_mod = load_check(run.repo_path)
+    install = run.install("codex")
+    write_listing(dest / "listing.txt", install, "codex", agents=False, commands=False)
+    errors = require_skills(install, list(check_mod.SKILLS))
+    if (install / "agents").exists():
+        errors.append("codex install has agents/")
+    if (install / "commands").exists():
+        errors.append("codex install has commands/")
+    plugin_dir = install / ".codex-plugin"
+    extra = [name for name in list_names(plugin_dir) if name != "plugin.json"] if plugin_dir.is_dir() else ["(missing .codex-plugin)"]
+    if extra:
+        errors.append(f".codex-plugin/ extra files {extra}")
+    manifest = json.loads((plugin_dir / "plugin.json").read_text(encoding="utf-8")) if (plugin_dir / "plugin.json").is_file() else {}
+    interface = manifest.get("interface") if isinstance(manifest, dict) else None
+    if not isinstance(interface, dict) or interface.get("displayName") != "Plan Build Verify":
+        errors.append("Codex interface.displayName must be Plan Build Verify")
+    return errors
+
+
+DRIVERS = {
+    "documented-build": drive_documented_build,
+    "cursor-local-install": drive_cursor,
+    "claude-plugin": drive_claude,
+    "codex-plugin": drive_codex,
+}
+
+
+def cmd_drive(run: Run, feature: str) -> int:
+    if feature not in DRIVERS:
+        raise SystemExit(f"unknown feature {feature}; expected {', '.join(DRIVERS)}")
+    dest = run.evidence_path / feature
+    if dest.exists():
+        shutil.rmtree(dest)
+    dest.mkdir(parents=True)
+    errors = DRIVERS[feature](run, dest)
+    report = "ok\n" if not errors else "fail\n" + "\n".join(errors) + "\n"
+    write_text(dest / "result.txt", report)
+    if errors:
+        print(report, file=sys.stderr)
+        return 1
+    print(f"proved {feature} under {dest}")
+    return 0
+
+
+def cmd_cleanup(run: Run) -> int:
+    home = run.home_path
+    assert_under(home, run.root_path)
+    assert_not_operator_plugin(home)
+    if home.is_dir():
+        shutil.rmtree(home)
+    print(f"removed {home}")
+    print(f"kept {run.evidence_path}")
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="control-pbv")
+    parser.add_argument("--run-id", default=None)
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("launch")
+    sub.add_parser("doctor")
+    drive = sub.add_parser("drive")
+    drive.add_argument("feature", choices=sorted(DRIVERS))
+    sub.add_parser("cleanup")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    repo = repo_root()
+    if args.command == "launch":
+        return cmd_launch(repo)
+    run = resolve_run(repo, args.run_id)
+    if args.command == "doctor":
+        return cmd_doctor(run)
+    if args.command == "drive":
+        return cmd_drive(run, args.feature)
+    if args.command == "cleanup":
+        return cmd_cleanup(run)
+    raise SystemExit(f"unknown command {args.command}")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
