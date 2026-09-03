@@ -135,6 +135,50 @@ def save_run(run: Run) -> None:
     write_text(run_json_path(run.root_path), json.dumps(run.dump(), indent=2) + "\n")
 
 
+def run_dir_from_id(base: Path, run_id: str) -> Path:
+    if os.path.isabs(run_id):
+        raise SystemExit(f"run identifier must not be absolute: {run_id}")
+    if not run_id or run_id in (".", ".."):
+        raise SystemExit(f"run identifier must not escape the evidence directory: {run_id}")
+    if ".." in Path(run_id).parts:
+        raise SystemExit(f"run identifier must not escape the evidence directory: {run_id}")
+    if os.path.sep in run_id or (os.path.altsep and os.path.altsep in run_id):
+        raise SystemExit(f"run identifier must be a single directory name: {run_id}")
+    run_dir = (base / run_id).resolve()
+    assert_under(run_dir, base.resolve())
+    return run_dir
+
+
+def bind_run(root: Path, version: str, repo: Path) -> Run:
+    run_root = root.resolve()
+    home = run_root / "home"
+    evidence = run_root / "evidence"
+    cursor_install = home / ".cursor" / "plugins" / "local" / "plan-build-verify"
+    claude_install = (
+        home / ".claude" / "plugins" / "cache" / "plan-build-verify" / "plan-build-verify" / version
+    )
+    codex_install = (
+        home / ".codex" / "plugins" / "cache" / "plan-build-verify" / "plan-build-verify" / version
+    )
+    run = Run(
+        run_id=run_root.name,
+        repo=str(repo),
+        root=str(run_root),
+        home=str(home),
+        evidence=str(evidence),
+        cursor_install=str(cursor_install),
+        claude_install=str(claude_install),
+        codex_install=str(codex_install),
+        version=version,
+    )
+    assert_under(run.home_path, run.root_path)
+    assert_not_operator_plugin(run.home_path)
+    for host in SKILL_HOSTS:
+        assert_under(run.install(host), run.home_path)
+        assert_not_operator_plugin(run.install(host))
+    return run
+
+
 def load_run(root: Path) -> Run:
     path = run_json_path(root)
     if not path.is_file():
@@ -144,13 +188,12 @@ def load_run(root: Path) -> Run:
     missing = required.difference(payload)
     if missing:
         raise SystemExit(f"{path} missing fields: {sorted(missing)}")
-    run = Run(**{field: str(payload[field]) for field in Run.__dataclass_fields__})
-    assert_under(run.home_path, run.root_path)
-    assert_not_operator_plugin(run.home_path)
-    for host in SKILL_HOSTS:
-        assert_under(run.install(host), run.home_path)
-        assert_not_operator_plugin(run.install(host))
-    return run
+    version = str(payload["version"])
+    if not version:
+        raise SystemExit(f"{path} missing version")
+    repo = repo_root()
+    assert_under(root.resolve(), evidence_base(repo).resolve())
+    return bind_run(root, version, repo)
 
 
 def latest_run(base: Path) -> Run:
@@ -168,10 +211,10 @@ def latest_run(base: Path) -> Run:
 def resolve_run(repo: Path, run_id: str | None) -> Run:
     base = evidence_base(repo)
     if run_id:
-        return load_run(base / run_id)
+        return load_run(run_dir_from_id(base, run_id))
     env_id = os.environ.get("VERIFY_PBV_RUN")
     if env_id:
-        return load_run(base / env_id)
+        return load_run(run_dir_from_id(base, env_id))
     return latest_run(base)
 
 
@@ -314,6 +357,12 @@ def require_command_descriptions(install: Path, dest: Path, descriptions: dict[s
 
 def drive_documented_build(run: Run, dest: Path) -> list[str]:
     errors: list[str] = []
+    if not run.home_path.is_dir():
+        errors.append(f"missing run home at {run.home_path}")
+    for host in SKILL_HOSTS:
+        install = run.install(host)
+        if not install.is_dir():
+            errors.append(f"missing {host} install at {install}")
     log = (run.evidence_path / "launch.log").read_text(encoding="utf-8")
     write_text(dest / "launch.log", log)
     for needle in (
@@ -368,12 +417,24 @@ def drive_claude(run: Run, dest: Path) -> list[str]:
     claude_bin = shutil.which("claude")
     if claude_bin is None:
         write_text(dest / "validate.log", "claude CLI not on PATH\n")
+        write_text(dest / "validate-repo.log", "claude CLI not on PATH\n")
         errors.append("claude CLI not on PATH")
         return errors
+    repo_tree = run.repo_path / "plugins" / "claude"
+    proc_repo = capture(
+        [claude_bin, "plugin", "validate", str(repo_tree), "--strict"],
+        cwd=run.repo_path,
+    )
+    write_text(
+        dest / "validate-repo.log",
+        format_proc(proc_repo, [claude_bin, "plugin", "validate", "./plugins/claude", "--strict"]),
+    )
+    if proc_repo.returncode != 0:
+        errors.append("claude plugin validate --strict failed on repository tree")
     proc = capture([claude_bin, "plugin", "validate", str(install), "--strict"], cwd=run.repo_path)
     write_text(dest / "validate.log", format_proc(proc, [claude_bin, "plugin", "validate", str(install), "--strict"]))
     if proc.returncode != 0:
-        errors.append("claude plugin validate --strict failed")
+        errors.append("claude plugin validate --strict failed on isolated copy")
     return errors
 
 
