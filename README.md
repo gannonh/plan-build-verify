@@ -25,8 +25,8 @@ Team marketplace import is Teams/Enterprise only and is not the Verify gate.
 ### Claude Code
 
 ```text
-/plugin marketplace add gannonh/plan-build-verify
-/plugin install plan-build-verify@plan-build-verify
+claude plugin marketplace add gannonh/plan-build-verify
+claude plugin install plan-build-verify@plan-build-verify
 ```
 
 Claude should surface the same five skills and three agents. `/plan`, `/build`, and `/verify` load the matching skill.
