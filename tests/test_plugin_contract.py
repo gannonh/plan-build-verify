@@ -165,8 +165,8 @@ def test_build_owns_pre_merge_acceptance_assets() -> None:
 
 def test_review_skill_preserves_agent_reviews_and_lifecycle_gates() -> None:
     text = (ROOT / "src" / "skills" / "review" / "SKILL.md").read_text(encoding="utf-8")
-    assert "npx agent-reviews --expanded --json" in text
-    assert "npx agent-reviews --reply" in text
+    assert "npx agent-reviews --pr <N> --expanded --json" in text
+    assert "npx agent-reviews --pr <N> --reply" in text
     assert "--resolve" in text
     assert "Thread resolved" in text
     assert "Thread already resolved" in text
@@ -178,6 +178,28 @@ def test_review_skill_preserves_agent_reviews_and_lifecycle_gates() -> None:
     assert "## PR closed without merge" in text
     assert "gh pr merge" in text
     assert "Do not paginate review comments with raw `gh`." in text
+
+
+def test_review_commands_keep_the_resolved_pr_target() -> None:
+    text = (ROOT / "src/skills/review/SKILL.md").read_text()
+    for command in ("view", "checks", "merge", "comment"):
+        examples = re.findall(rf"gh pr {command}([^`\n]*)", text)
+        assert examples, command
+        assert all(example.startswith(" <N> --repo <owner/repo>") for example in examples), command
+    examples = re.findall(r"(?:^|`)npx agent-reviews([^`\n]*)", text, re.MULTILINE)
+    assert all(not example or example.startswith(" --pr <N>") for example in examples)
+    assert "Confirm the checkout's remote matches the target repository" in text
+    assert "headRefName" in text
+    assert "headRefOid" in text
+
+
+def test_build_requires_the_draft_pr_before_ready() -> None:
+    text = (ROOT / "src/skills/build/references/build.md").read_text()
+    draft = text.index("## Open a draft pull request")
+    ready = text.index("## Record the matrix and mark ready")
+    assert draft < ready
+    assert "merges without PRs" not in text
+    assert "If draft PR creation fails, comment on Linear with the exact ask and stop." in text
 
 
 def test_plan_ends_at_human_todo_approval() -> None:

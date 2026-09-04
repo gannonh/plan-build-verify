@@ -19,7 +19,7 @@ After merge-ready gates pass, move the issue to Human Review and stop. Merge onl
 Review comments go through [agent-reviews](https://github.com/pbakaus/agent-reviews) at runtime.
 
 ```bash
-npx agent-reviews
+npx agent-reviews --pr <N>
 ```
 
 Do not vendor `agent-reviews` into this repository. Do not add it to a package.json. Do not npm-pack it. `npx` fetches the published CLI when the skill runs. Node.js 18+ is required. If the project prefers another runner, use that runner's equivalent (`pnpm dlx agent-reviews`, `yarn dlx agent-reviews`, or `bunx agent-reviews`).
@@ -30,7 +30,7 @@ The CLI inventories three GitHub comment types: inline review comments (`CODE`),
 
 Do not paginate review comments with raw `gh`. Do not use `gh api graphql` review-thread queries or `gh api` review-comment list endpoints to inventory or reply.
 
-`gh` remains correct for PR metadata, checks, run logs, mergeability, and merge. Reply to non-inline comments and review summaries through `gh pr comment`, linking the original comment. Keep their inventory in `agent-reviews`.
+`gh` remains correct for PR metadata, checks, run logs, mergeability, and merge. Reply to non-inline comments and review summaries through `gh pr comment <N> --repo <owner/repo>`, linking the original comment. Keep their inventory in `agent-reviews`.
 
 ## When to use
 
@@ -54,6 +54,10 @@ If the issue is Human Review and the user did not explicitly resume work, stop. 
 
 If the issue is Canceled or Duplicate, stop and leave it there.
 
+Resolve the target repository and PR number once from the caller's input or the current branch. Every `<N>` and `<owner/repo>` below refers to that same target. Run `agent-reviews` from the target repository's checkout. Confirm the checkout's remote matches the target repository before inventory or replies; the CLI has no repository flag.
+
+Before editing, confirm the checkout uses the target PR's `headRefName` and matches its current `headRefOid`. Switch to its existing head branch only after checking worktree safety and the Linear state. Stop on unrelated local changes or an unverified head. Keep the resolved PR target through every wait, push, revalidation, and merge.
+
 ## Landing loop
 
 Re-read the Linear issue before each iteration, before dispatching any coding, CI-fix, or review agent, and after a wait. Stop immediately on Human Review without an explicit resume, an unexpected state, or a terminal state. Work on the PR's existing head branch, including PRs authored by others.
@@ -63,10 +67,10 @@ Review comments first. A review fix produces a new commit that retriggers CI. Fi
 ### 1. Inventory comments and open asks
 
 ```bash
-npx agent-reviews --expanded --json
+npx agent-reviews --pr <N> --expanded --json
 ```
 
-Add `--pr <N>` when the caller named a PR. The CLI auto-detects the current branch's PR otherwise.
+Always pass the resolved PR number, including when it was initially discovered from the current branch.
 
 Build a ledger before editing. For each comment record `id`, author, human or bot, type (`CODE`, `COMMENT`, or `REVIEW`), path, ask, classification, evidence, action, and disposition. Inspect follow-up replies for new asks even when a thread already has an agent or human reply.
 
@@ -95,25 +99,25 @@ Validate locally after fixes. Commit and push when code changed. Capture the hea
 Reply to every processed comment. Prefix the body with `[agent]` so authorship is unambiguous.
 
 ```bash
-npx agent-reviews --reply <id> "[agent] Fixed in <sha>. <what changed>"
+npx agent-reviews --pr <N> --reply <id> "[agent] Fixed in <sha>. <what changed>"
 ```
 
 ```bash
-npx agent-reviews --reply <id> "[agent] <disposition>. <evidence-backed rationale>" --resolve
+npx agent-reviews --pr <N> --reply <id> "[agent] <disposition>. <evidence-backed rationale>" --resolve
 ```
 
 Use `--resolve` after a tested fix or an evidence-backed disposition completes the ask. If a reviewer must confirm, leave the thread open and keep the issue in Agent Review. For `unsafe-to-change`, post the exact ask on Linear and stop. Ignore unpublished GitHub `PENDING` reviews.
 
 Inspect the textual result of each resolution command. Require `Thread resolved` or `Thread already resolved`; exit code zero alone is insufficient because resolution errors can follow successful replies. A warning, missing receipt, or renewed ask leaves the thread open. Do not add `--json` to resolution commands because its output omits this result.
 
-For a general PR comment or review summary, post the `[agent]` response with `gh pr comment <N> --body-file <reply-file>`, include a link to the original comment, and record the outcome. The CLI skips replies to these non-inline items. Do not invent extra `agent-reviews` flags. Do not retry review-thread inventory with raw `gh`.
+For a general PR comment or review summary, post the `[agent]` response with `gh pr comment <N> --repo <owner/repo> --body-file <reply-file>`, include a link to the original comment, and record the outcome. The CLI skips replies to these non-inline items. Do not invent extra `agent-reviews` flags. Do not retry review-thread inventory with raw `gh`.
 
 ### 4. Watch for new comments
 
 After replies are posted:
 
 ```bash
-npx agent-reviews --expanded --json
+npx agent-reviews --pr <N> --expanded --json
 ```
 
 Compare with the ledger after every push and before handoff. Process new comments and follow-up asks through step 1. A watcher may signal activity, but the full inventory determines what remains.
@@ -121,8 +125,8 @@ Compare with the ledger after every push and before handoff. Process new comment
 ### 5. Wait for CI to settle
 
 ```bash
-gh pr view --json number,isDraft,headRefOid,mergeable,mergeStateStatus,statusCheckRollup
-gh pr checks --required --watch --fail-fast
+gh pr view <N> --repo <owner/repo> --json number,isDraft,headRefName,headRefOid,mergeable,mergeStateStatus,statusCheckRollup
+gh pr checks <N> --repo <owner/repo> --required --watch --fail-fast
 ```
 
 Drop `--required` when the repo marks nothing as required. Keep consuming the watch output in the same turn. A pending or queued check is not settled. A cancelled skip is not green.
@@ -132,7 +136,7 @@ Drop `--required` when the repo marks nothing as required. Keep consuming the wa
 When checks have finished and failed:
 
 ```bash
-gh run view <run-id> --log-failed
+gh run view <run-id> --repo <owner/repo> --log-failed
 ```
 
 If a single job failed while the run is still going, pull that job's logs. Do not wait for the whole run when the failure is already visible.
@@ -140,7 +144,7 @@ If a single job failed while the run is still going, pull that job's logs. Do no
 Classify:
 
 - Branch-related. Compile, test, lint, typecheck, or snapshot failures in code this branch touched. Fix, validate locally, commit, push.
-- Flaky or infrastructural. Timeouts, runner provisioning, registry or network outages, Actions infra errors. Rerun up to 3 times with `gh run rerun <run-id> --failed`.
+- Flaky or infrastructural. Timeouts, runner provisioning, registry or network outages. Rerun up to 3 times with `gh run rerun <run-id> --repo <owner/repo> --failed`.
 
 Do not edit tests, CI configuration, or dependency pins to hide an unrelated failure. If classification is ambiguous, diagnose once before rerunning.
 
@@ -182,7 +186,7 @@ Merge is permitted only after a fresh Merging-state check and revalidation of me
 1. Re-read `get_issue({ "id": "<id>", "includeRelations": true })`.
 2. Stop unless the state is Merging.
 3. Re-run the merge-ready gates on the current head SHA.
-4. Re-read Linear immediately before merging and stop unless it is still Merging. Merge with `gh pr merge --match-head-commit <validated-sha>` using the repo's merge method.
+4. Re-read Linear immediately before merging and stop unless it is still Merging. Merge with `gh pr merge <N> --repo <owner/repo> --match-head-commit <validated-sha>` using the repo's merge method.
 5. Re-read the issue. Integration should move it to Done. Confirm Done. Skip a duplicate Done write.
 
 Do not merge from Agent Review or Human Review.

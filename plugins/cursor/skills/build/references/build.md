@@ -248,7 +248,7 @@ Retain scratch or follow-up issue IDs in a linked evidence artifact when needed 
 
 Draft PR open may move the issue to In Progress via integration. Re-read the issue and skip a duplicate In Progress write.
 
-If the repo merges without PRs, skip this step and say so.
+If draft PR creation fails, comment on Linear with the exact ask and stop.
 
 ## Record the matrix and mark ready
 
