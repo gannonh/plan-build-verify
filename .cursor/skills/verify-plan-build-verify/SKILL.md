@@ -36,7 +36,7 @@ Pass only when all of these hold:
 
 - `python3 scripts/check.py` exits 0. Stdout is `plugin trees match src/ and host layout rules`.
 - The run's Cursor, Claude, and Codex copies exist.
-- Each copy has skills `plan`, `build`, `verify`, `triage`, and `ship`.
+- Each copy has skills `plan`, `build`, `review`, `verify`, and `triage`.
 - Each copy has only that host's plugin.json directory.
 
 Run doctor before the first drive, after any failed drive, and whenever the trees look wrong. Do not drive a copy this run did not create.
@@ -54,7 +54,7 @@ Use `control-pbv`. Treat every command as literal.
 
 Stable handles:
 
-- Skill directory names `plan`, `build`, `verify`, `triage`, `ship` under `skills/`.
+- Skill directory names `plan`, `build`, `review`, `verify`, `triage` under `skills/`.
 - Agent files `plan-agent.md`, `build-agent.md`, `verify-agent.md` under `agents/` on Cursor and Claude.
 - Command files `commands/plan.md`, `commands/build.md`, `commands/verify.md` whose YAML `description` values are `Run the plan-build-verify Plan workflow`, `Run the plan-build-verify Build workflow`, and `Run the plan-build-verify Verify workflow`.
 - Host manifests `.cursor-plugin/plugin.json`, `.claude-plugin/plugin.json`, and `.codex-plugin/plugin.json`.

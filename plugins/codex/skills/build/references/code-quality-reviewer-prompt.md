@@ -11,7 +11,7 @@ Task tool (general-purpose):
   Prefer a compatible installed code-review skill when available. Otherwise use the compact local rubric at references/code-reviewer.md
 
   DESCRIPTION: [Task summary from implementer's report]
-  SPEC_PATH: [Spec path]
+  SPEC_ISSUE: [Linear issue id]
   TASK_ID: [Task ID]
   PLAN_OR_REQUIREMENTS: [Task text and acceptance criteria]
   BASE_SHA: [Commit before task]

@@ -15,9 +15,9 @@ HOSTS = ("cursor", "claude", "codex")
 SKILLS = (
     "plan",
     "build",
+    "review",
     "verify",
     "triage",
-    "ship",
 )
 HASHED_RELATIVE = (
     "SKILL.md",

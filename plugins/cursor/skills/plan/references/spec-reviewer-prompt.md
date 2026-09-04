@@ -12,7 +12,7 @@ Task tool (general-purpose):
 
     ## Spec and task
 
-    Spec path: [SPEC_PATH]
+    Spec issue: [LINEAR_ISSUE_ID]
     Task ID: [TASK_ID]
 
     ## What was requested

@@ -1,39 +1,32 @@
-# GitHub Conventions
+# Linear Conventions
 
-Shared contract for every mode of this skill. Read this file completely before Plan, Build, Verify, Triage, Ship, or Migrate.
+Shared contract for every mode of this skill. Read this file completely before Plan, Build, Review, Verify, or Triage.
 
 ## Core rule
 
-**The GitHub Issue is the spec.** Local Markdown is a temporary body file used to compose or edit an issue body, and it is deleted once the `gh` write succeeds. Nothing spec-shaped stays in the repo working tree.
+The Linear issue and any parent epic are the spec. GitHub Issues are inbound context only. GitHub holds code, pull requests, CI, and diff reviews. Durable architecture, process, ADR, and evidence documents live under `docs/`.
 
-If `gh` fails, stop and report the failure. Do not save the spec as a repo file as a fallback; that recreates the two-sources-of-truth problem this skill exists to remove.
+Read the issue and parent before implementing. Implement only the written AC, using the smallest change that satisfies them. Edit the Linear spec before continuing when research or implementation changes it. File work outside the AC as a separate Backlog issue and keep it out of the current PR.
 
-## Coexistence with pstack and other skills in this pack
+A request without a Linear issue needs one before Build starts. Create it through Plan or ask. Small bounded edits such as a copy change or a single config value are exempt.
 
-plan-build-verify sequences product work for GitHub-issue product repos (`devbox`, `kata-code`, `kata-agents`, `kata-symphony`). It is the only product operating system in those repos. Install this plugin on the host. Do not npx-add `plan-build-verify` from `gannonh/skills`.
+When blocked, post a Linear comment with the exact ask and stop. If MCP itself is unavailable, report the failed call and ask directly.
 
-| Layer | Owns | Does not own |
-| ----- | ---- | ------------ |
-| plan-build-verify | Specs as GitHub Issues, priority, Plan / Build / Verify lifecycle, `kind:*` / `status:*` / `phase:*` / `needs:*` labels, acceptance criteria | Implementation tactics inside a Build or Verify run |
-| pstack (Cursor plugin) | Engineering execution and proof inside Build and Verify (poteto-mode, TDD, per-repo verify skill, feature map); investigation during Plan (`architect`, `how`, `why`) | Whether work is approved, roadmap priority, label transitions, or a second spec store |
-| ps (`/ps` in this pack) | Nothing for product delivery. Historical pstack port; unwieldy; do not npx-install it | Substitute for the pstack Cursor plugin |
-| okf / finalize's OKF step | Nothing. **Retired.** Kept in the library for history only | Any live roadmap (`docs/specs/index.md` or otherwise) |
-| kata-linear | Linear ticket lifecycle in Linear-first repos | Those four GitHub-issue product repos |
+If a Linear MCP write fails, stop and report the failure. Do not save the spec as a repo file.
 
-Rules:
+## Skills
 
-- Agents must not skip an unapproved issue because "the best spec is code." The issue's `status:*` label and `## Status` section decide readiness for Build.
-- For product-shaped work, run an architect checkpoint during Plan as investigation. Do not use pstack's never-block-on-the-human guidance to build past an unapproved spec.
-- A per-repo `verify-*` skill (slash form `/verify-<app>`, typically `.cursor/skills/verify-*/SKILL.md`) and its feature map complement the issue's `## Demonstration` and `## Verification` sections. They do not replace acceptance criteria on the issue. During Verify, discover and follow `/verify-*` for launch and drive before falling back to bundled UAT playbooks. Do not generate a verification skill mid-Verify.
-- Do not invent a second issue tracker. Do not create or maintain product specs under `docs/specs/` except the migration index/archive this skill leaves after Migrate. Temporary body files only, then delete them after the `gh` write.
-- OKF is retired. Do not run `okf init`, `okf update`, or finalize's OKF documentation step as a roadmap writer or as docs-as-spec. Do not present OKF as a live alternative.
-- Do not use `kata-linear` as the work-item lifecycle in those four repos. It is for Linear-first projects only.
-- Install this plugin for product delivery. It ships `plan`, `build`, `verify`, `triage`, and `ship`. Do not install `ps`, `okf`, or `kata-linear`. Do not npx-add `plan-build-verify` from `gannonh/skills`. Never `npx skills add -g`.
-- `ship` calls `npx agent-reviews` ([pbakaus/agent-reviews](https://github.com/pbakaus/agent-reviews)) at runtime to list, filter, reply, and watch review comments. That CLI is a runtime dependency. Do not vendor it. Do not add it to a package.json. Do not paginate review comments with raw `gh`.
+This plugin provides `plan`, `build`, `review`, `verify`, and `triage`. Agents call the host Linear MCP directly. There is no tracker abstraction, Linear CLI wrapper, Linear shell script, or MCP credential helper.
+
+`review` calls `npx agent-reviews` ([pbakaus/agent-reviews](https://github.com/pbakaus/agent-reviews)) at runtime to list, filter, reply, and watch PR comments. That CLI is a runtime dependency. Do not vendor it. Do not add it to a package.json. Do not paginate review comments with raw `gh`.
+
+`gh` is for GitHub code workflows: PR metadata, checks, run logs, and merge. Triage may also run `gh issue list`, `gh issue view`, and `gh issue comment` when sweeping inbound GitHub Issues and writing backlinks. All other planning, status, hierarchy, and comment writes use Linear MCP.
+
+Ship is reserved for project-defined releases after Verify. This plugin has no release skill.
 
 ### Install this plugin
 
-**Cursor** (local plugin import, the Verify gate):
+**Cursor** (local plugin import):
 
 ```bash
 cp -R plugins/cursor ~/.cursor/plugins/local/plan-build-verify
@@ -55,118 +48,175 @@ codex plugin marketplace add gannonh/plan-build-verify
 codex plugin add plan-build-verify@plan-build-verify
 ```
 
-If a Codex sparse checkout is used, it must be `--sparse .agents/plugins --sparse plugins/codex`. Do not use `--sparse .agents/plugins` alone.
+If a Codex sparse checkout is used, it must be `--sparse .agents/plugins --sparse plugins/codex`.
 
-pstack stays a separate Cursor plugin for engineering execution inside Build and Verify.
-
-### AGENTS.md snippet for product repos
-
-Paste this into the product repo's `AGENTS.md`:
+### AGENTS.md snippet
 
 ````markdown
 ## Skills
 
-Product OS is the `plan-build-verify` plugin. Specs are GitHub Issues, not files under `docs/specs/`.
+Product OS is the `plan-build-verify` plugin. Specs are Linear issues. GitHub Issues are inbound reports only.
 
-Install the plugin for the host you use (Cursor local import, Claude Code marketplace, or Codex marketplace). Do not npx-add `plan-build-verify` from `gannonh/skills`.
-
-Cursor engineering execution is the **pstack** plugin. Do not install `ps`, `okf`, or `kata-linear` for this repo. OKF is retired.
+Install the plugin for the host you use (Cursor local import, Claude Code marketplace, or Codex marketplace).
 ````
 
 ## Preflight
 
-Run once per session, before the first `gh` write.
+Run once per session before the first Linear write.
 
-```bash
-gh auth status
-gh repo view --json nameWithOwner,defaultBranchRef -q '.nameWithOwner + " (default: " + .defaultBranchRef.name + ")"'
-gh extension list | grep -q 'gh sub-issue' && echo "sub-issue: present" || echo "sub-issue: missing"
+1. **GitHub repo.** `gh auth status` and `gh repo view --json nameWithOwner,defaultBranchRef`. Record `<owner>/<repo>` and the default branch.
+2. **Linear MCP.** Confirm the host exposes `list_teams`, `get_team`, `list_projects`, `get_issue`, `save_issue`, `save_comment`, `list_comments`, `list_issues`, and `list_issue_statuses`. Stop if any of those are missing. Call `list_issue_labels` and `create_issue_label` only when applying optional hygiene labels.
+3. **Team and project.** Read the project's automation record (see below). Resolve the team through `list_teams` / `get_team` and the project through `list_projects`. Scope discovery queries and issue creation to those resolved identifiers. Updates use the existing issue ID and preserve its team and project.
+4. **Required states.** Call `list_issue_statuses` with `{ "team": "<team>" }`. Resolve IDs for Backlog, Todo, In Progress, Agent Review, Human Review, Merging, Done, Canceled, and Duplicate. Stop if any name is missing.
+5. **Automation ownership.** Load the recorded event-to-state mappings. A missing record, or a live transition that conflicts with the record, requires a current maintainer screenshot or equivalent confirmation before dependent actions. Do not ask the user to reconfirm unchanged settings on every invocation.
+6. **Issue graph.** For the issue in scope, call `get_issue` with `{ "id": "<id>", "includeRelations": true }`. Record parent, children, `blockedBy`, `blocks`, and `gitBranchName`.
+
+## Linear MCP tools
+
+Call tools with structured arguments. Use only these fields.
+
+`get_issue`
+
+```
+get_issue({
+  "id": "KAT-1234",
+  "includeRelations": true
+})
 ```
 
-Checks:
+Returns `gitBranchName` plus relation data when `includeRelations` is true.
 
-1. **Authentication.** If `gh auth status` fails, stop and ask the user to run `gh auth login`.
-2. **Target repo.** `gh repo view` resolves from the current git remote. If the repo is a fork or the roadmap lives elsewhere, ask the user which repo owns the roadmap and pass `--repo <owner>/<name>` on every subsequent command.
-3. **Issues enabled.** If `gh issue list` errors with issues disabled, stop and tell the user.
-4. **Labels.** Run `scripts/ensure_labels.sh` (see below). It is idempotent and safe to re-run.
-5. **Sub-issue extension.** Required only when decomposing a spec. If missing, offer `gh extension install yahsan2/gh-sub-issue` or use the fallback in "Sub-issues" below. Note its `create` subcommand has no `--body-file`; always use the two-step form in "Sub-issues".
-6. **Dependency support.** Native, no extension needed, but it requires a recent `gh`. If `gh issue edit --help` does not list `--add-blocked-by`, tell the user to upgrade `gh` and record dependencies in the issue body prose until they do.
+`save_issue` creates when `id` is omitted and updates when `id` is present:
 
-Record the resolved `<owner>/<repo>` for the session and reuse it.
-
-## Label taxonomy
-
-This skill owns four namespaces and creates them automatically:
-
-| Label                       | Color    | Meaning                                                            |
-| --------------------------- | -------- | ------------------------------------------------------------------ |
-| `kind:spec`                 | `0E8A16` | A standalone spec issue. Every spec issue carries this.            |
-| `kind:epic`                 | `5319E7` | A spec decomposed into sub-issues. Carries `kind:spec` as well.    |
-| `kind:sub-spec`             | `C2E0C6` | A child issue produced by decomposing an epic.                     |
-| `status:draft`              | `FBCA04` | Spec is being written or revised. Build is blocked.                |
-| `status:approved`           | `0E8A16` | User approved the spec. Build may start.                           |
-| `status:implemented`        | `1D76DB` | Build completed and reported. Verify may start.                    |
-| `status:verified`           | `0052CC` | Acceptance evidence accepted by the user.                          |
-| `status:blocked`            | `B60205` | Work cannot proceed. The issue body states why.                    |
-| `phase:plan`                | `D4C5F9` | Currently in Plan.                                                 |
-| `phase:build`               | `BFD4F2` | Currently in Build.                                                |
-| `phase:verify`              | `C5DEF5` | Currently in Verify.                                               |
-| `needs:acceptance-criteria` | `E99695` | Issue has no usable `## Acceptance criteria` section.              |
-| `needs:decomposition`       | `E99695` | Scope is too large for one spec.                                   |
-| `needs:triage`              | `E99695` | Issue has not been groomed into this skill's model.                |
-
-Rules:
-
-- `status:*` labels are **mutually exclusive**. Every transition removes the old one and adds the new one in a single `gh issue edit` call.
-- `phase:*` labels are also mutually exclusive and reflect what is happening right now. Remove the `phase:*` label when a phase ends without immediately starting the next one. Leaving `phase:plan` on a `status:approved` (or later) issue is a triage defect; the draft → approved transition must remove it in the same turn.
-- `needs:*` labels are triage flags. Clear them when the underlying gap is fixed.
-- **Adopt existing repo labels** for area, component, priority, and type (`enhancement`, `feature`, `bug`, and similar). Those are the repo's labels, not a plan-build-verify namespace. Reuse them; do not invent a parallel type system or tell people to replace them. Run `gh label list --limit 200` during preflight. Only the `kind:`, `status:`, `phase:`, and `needs:` namespaces belong to this skill.
-
-Create or repair the taxonomy:
-
-```bash
-bash <skill-dir>/scripts/ensure_labels.sh                 # current repo
-bash <skill-dir>/scripts/ensure_labels.sh --repo owner/name
-bash <skill-dir>/scripts/ensure_labels.sh --dry-run
+```
+save_issue({
+  "title": "Export workflow for saved reports",
+  "team": "<team>",
+  "project": "<project>",
+  "state": "Backlog",
+  "description": "<spec body>",
+  "parentId": "KAT-1000",
+  "blockedBy": ["KAT-1100"],
+  "blocks": ["KAT-1200"],
+  "relatedTo": ["KAT-1300"],
+  "labels": ["needs-triage"],
+  "links": [{"title": "GitHub #12", "url": "https://github.com/owner/repo/issues/12"}]
+})
 ```
 
-The script uses `gh label create --force`, which creates missing labels and updates color and description on existing ones. It never deletes labels.
+Relation arrays add edges. Remove specific edges with `removeBlockedBy`, `removeBlocks`, or `removeRelatedTo`. Do not use an empty addition array to remove edges. Read the graph before changing it and preserve unrelated relations.
 
-## Temporary body files
-
-Compose issue bodies in a scratch file, then write through `gh`:
-
-```bash
-BODY="$(mktemp "${TMPDIR:-/tmp}/pbv-spec.XXXXXX.md")"
-# write the spec body to "$BODY"
-gh issue create --title "<title>" --body-file "$BODY" --label "kind:spec,status:draft,phase:plan"
-rm -f "$BODY"
+```
+save_issue({ "id": "KAT-1234", "removeBlockedBy": ["KAT-1100"] })
 ```
 
-Rules:
+`save_comment`
 
-- Use the session scratchpad directory or `mktemp`. Never write drafts into the repo working tree, not even temporarily, and never into `docs/`.
-- Delete the file after the `gh` command exits successfully.
-- To revise an issue body, pull the current body down, edit it, push it back, then delete the file:
-
-```bash
-gh issue view <N> --json body -q .body > "$BODY"
-# edit "$BODY"
-gh issue edit <N> --body-file "$BODY"
-rm -f "$BODY"
+```
+save_comment({
+  "issueId": "KAT-1234",
+  "body": "## Build completion report\n..."
+})
 ```
 
-- Always round-trip through `--body-file`. Passing multi-line spec bodies through `--body` on the command line mangles backticks, quotes, and newlines.
+`list_comments`
+
+```
+list_comments({
+  "issueId": "KAT-1234"
+})
+```
+
+`list_issue_statuses`
+
+```
+list_issue_statuses({
+  "team": "<team>"
+})
+```
+
+`list_issues`
+
+```
+list_issues({
+  "team": "<team>",
+  "project": "<project>",
+  "state": "Todo",
+  "query": "export workflow",
+  "parentId": "KAT-1000",
+  "includeArchived": false,
+  "cursor": "<cursor>"
+})
+```
+
+Optional hygiene labels:
+
+```
+list_issue_labels({ "team": "<team>" })
+create_issue_label({ "team": "<team>", "name": "needs-triage" })
+```
+
+Create a missing hygiene label before passing its name in `save_issue.labels`.
+
+For a label update, read the current labels and supply the complete intended label set, preserving unrelated labels. To remove a hygiene label, omit only that label from the intended set. Re-read the issue to confirm the result. If the host tool does not support replacing the set, report that removal is unsupported and stop that correction. Never assume a one-label payload preserves other labels.
+
+## Automation policy
+
+Record each project's PR automation in an existing process document under `docs/`, or in `docs/development-lifecycle.md` when none exists. Record the team, event-to-state mappings, branch-specific rules, verification date, and the maintainer who supplied or confirmed the settings.
+
+This repository's record is `docs/development-lifecycle.md` (Kata-sh, Gannon Hall, 2026-09-04). Other projects record their own settings.
+
+For this repository the integration owns:
+
+- Draft PR open moves the issue to In Progress.
+- PR open moves it to Agent Review.
+- PR review request or activity performs no action.
+- PR ready for merge performs no action.
+- PR merge moves it to Done.
+
+No branch-specific rules are configured. Parent issues auto-close when their last sub-issue closes. Sub-issues do not auto-close with their parent. Stale issues move to Canceled after six months. Closed items auto-archive after six months.
+
+After a GitHub event, read the issue before any state write. Confirm an integration-owned transition when observed. If draft readiness leaves the issue in In Progress, Build performs In Progress to Agent Review after its gates pass. Never move a paused Human Review issue back to Agent Review. Do not configure automation into Human Review or Merging.
+
+## Workflow states
+
+Linear state is the sole approval and phase signal.
+
+| State | Meaning | Who moves it |
+| ----- | ------- | ------------ |
+| Backlog | Research and Plan. Specs are written here. | Plan creates here. Humans may return work here. |
+| Todo | Approved and queued. | Humans only: Backlog to Todo. |
+| In Progress | Build has an explicit start. | Agents start from Todo. Draft PR open may also land here via integration. |
+| Agent Review | PR is ready for review landing. | Integration on PR open, or Build after readiness if still In Progress. |
+| Human Review | Merge-ready. Coding, CI-fix, and review agents pause. | Review agents after merge-ready gates. |
+| Merging | Human granted merge permission. | Humans only. |
+| Done | Relevant PR merged. | Integration on merge. |
+| Canceled | Terminal. New work needs a new issue. | Humans or stale automation. |
+| Duplicate | Terminal. New work needs a new issue. | Humans. |
+
+Build requires Todo plus an explicit start, then moves Todo to In Progress.
+
+Human Review pauses all coding, CI-fix, and review agents until the issue moves to an applicable state or a human explicitly resumes them. Applicable states: In Progress for Build, Agent Review for Review, Merging for merge, Done for Verify.
+
+## State writes
+
+Before every `save_issue` state write:
+
+1. Re-read with `get_issue({ "id": "<id>", "includeRelations": true })`.
+2. Skip when the current state already equals the target.
+3. Stop when the current state is Human Review, Canceled, or Duplicate, unless a human explicitly resumed the agent or the action is the documented closed-PR reconciliation to Todo.
+4. Stop when the current state conflicts with the planned transition (for example Agent Review when Build still expects In Progress, or Done when Review still expects Agent Review).
+5. Then write `save_issue({ "id": "<id>", "state": "<target>" })`.
+
+Closed-PR reconciliation: when a PR closes without merge, the observing agent records the reason with `save_comment` and moves the issue to Todo, including from Human Review. That path does not authorize coding, CI fixes, or a review run. A fresh explicit start is required to build again. Leave Canceled and Duplicate unchanged.
 
 ## Spec issue body template
 
-Use this shape for `kind:spec` and `kind:sub-spec` issues. Scale each section to the work; omit sections that do not apply. `## Status`, `## Acceptance criteria`, and `## Delivery slices` are mandatory and must use these exact headings. `## Demonstration` is also mandatory for every standalone spec or sub-spec that Build can execute; an epic parent delegates demonstrations to its children.
+Use this shape. Scale each section to the work. Omit sections that do not apply. `## Acceptance criteria` and `## Delivery slices` are mandatory and must use these exact headings. `## Demonstration` is mandatory for every standalone spec or sub-issue that Build can execute; an epic parent delegates demonstrations to its children.
+
+Do not include a Status section. Linear state is the status.
 
 ```markdown
-## Status
-
-Draft
-
 ## Goal
 
 <the outcome, in one or two sentences>
@@ -175,7 +225,7 @@ Draft
 
 <current state, verified facts about the repo, links to related issues, PRs, ADRs, or designs>
 
-## Constraints and non-goals
+## Constraints
 
 <explicit boundaries, governing rules, and what this spec will not do>
 
@@ -206,7 +256,7 @@ Draft
 
 <required public-boundary E2E command; additional unit/integration checks; required screenshot checkpoints for visual targets; preferred video recorder or expected environment limitation; manual UAT steps>
 
-## Risks and mitigations
+## Risks
 
 <specific risks with practical mitigations>
 
@@ -220,248 +270,105 @@ Draft
 - Blocking open questions: None
 ```
 
-Notes:
+Write acceptance criteria as `- [ ]` checkboxes.
 
-- Write acceptance criteria as GitHub task-list checkboxes (`- [ ]`). Verify checks them off as each one passes, which makes the issue show live acceptance progress in the list view.
-- `## Delivery slices` is mandatory for all specs; an epic parent lists its children, while a sub-spec usually contains one slice. It describes increments of demonstrable behavior, not storage/backend/frontend/testing work packages. A slice crosses whichever technical layers it needs to produce an observable outcome.
-- `## Demonstration` is mandatory for standalone specs and sub-specs. It must name the consumer, action/input, observable result, and evidence that works without waiting for later siblings. A technical-enablement exception records its blocker, minimum scope, contract/integration evidence, and immediate user-facing slice unlocked instead.
-- Every user-facing slice plans a passing public-boundary E2E test. Visual slices also plan required starting/final screenshots. Video is ideal when temporal behavior matters, but its tooling is best-effort: use the documented bounded attempt and skip-and-flag contract instead of making Verify spin.
-- The `## Status` section mirrors the `status:*` label. Both must agree. Update them in the same turn. A mismatch is a triage defect. Do not treat `status:approved` alone as proof the body should say Approved; without independent approval evidence, Triage asks first and defaults to reverting the label (see `references/triage.md`).
-- Keep this template and `.github/ISSUE_TEMPLATE/spec.md` in sync. That file is the canonical GitHub issue form for new specs in this skills repo; product repos should copy it rather than drift.
-- Do not use YAML frontmatter in issue bodies. GitHub renders it as a table or as literal text. Status lives in the `## Status` section and the label.
+`## Delivery slices` describes increments of demonstrable behavior. A slice crosses whichever technical layers it needs to produce an observable outcome.
 
-## Status transitions
+`## Demonstration` must name the consumer, action/input, observable result, and evidence that works without waiting for later siblings.
 
-| Transition                             | When                                                   | Command                                                                                             |
-| -------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| create → `status:draft`                | Plan publishes the spec issue                          | `gh issue create --label "kind:spec,status:draft,phase:plan"`                                        |
-| `status:draft` → `status:approved`     | User explicitly approves the written spec              | `gh issue edit N --remove-label status:draft --add-label status:approved --remove-label phase:plan`  |
-| `status:approved` → `status:implemented` | Build completes all gates and posts its report       | `gh issue edit N --remove-label status:approved,phase:build --add-label status:implemented`          |
-| `status:implemented` → `status:verified` | User accepts the acceptance evidence                 | `gh issue edit N --remove-label status:implemented,phase:verify --add-label status:verified`         |
-| any → `status:blocked`                 | Work cannot proceed; reason recorded in a comment      | `gh issue edit N --remove-label <current> --add-label status:blocked`                                |
-| `status:approved` → `status:draft`     | User requests changes after approval                   | `gh issue edit N --remove-label status:approved --add-label status:draft,phase:plan`                 |
+## Hierarchy and dependencies
 
-Update the `## Status` section in the body to match, in the same turn as the label change. On `status:draft` → `status:approved`, remove `phase:plan` in that same edit; a leftover `phase:plan` after approval is a triage defect.
+Parent/sub-issue composition uses `parentId` on `save_issue`. Blocking order uses `blockedBy` and `blocks`.
 
-Close the issue only when it reaches `status:verified`, or when the user decides the work will not be done. A merged PR containing `Closes #N` closes the issue automatically; if Verify has not run, reopen it or record why verification was skipped.
+- The parent issue keeps goal, context, constraints, architecture, risks, and top-level acceptance criteria.
+- Each child gets its own scoped `## Acceptance criteria`, `## Demonstration`, and `## Build handoff`.
+- Make the first child a walking skeleton when feasible.
+- Children link back to the parent in `## Context`.
+- Build, Review, and Verify run per child.
+- An open `blockedBy` issue is a stop condition.
 
-## Sub-issues
-
-Decompose when a spec contains more than one independently deliverable and verifiable user outcome, or when the user asks.
-
-**Structure: parent holds the outcome; children each deliver a vertical slice.**
-
-A vertical slice is the thinnest end-to-end behavior that a human, operator, or API/SDK consumer can see, use, or evaluate. It may cross storage, domain logic, backend, protocol, UI, documentation, and tests. Those layers are implementation tasks inside the slice, not sibling roadmap issues.
-
-- The parent issue keeps goal, context, constraints, architecture, risks, and top-level acceptance criteria. Label it `kind:spec,kind:epic`.
-- Derive children from user journeys and acceptance outcomes. Each child gets its own scoped `## Acceptance criteria`, mandatory `## Demonstration`, and `## Build handoff`. Label each `kind:sub-spec` plus its own `status:*`.
-- Make the first child a walking skeleton when feasible: a narrow real path through the system that users can exercise and that later slices deepen.
-- Do not create separate schema/storage, backend, protocol, frontend, test, or polish children when a useful end-to-end slice can include the minimum needed from each.
-- A technical-enablement child is an exception. Use one only when safety or feasibility prevents a thin end-to-end slice; keep it minimal, document why, and identify the immediate user-facing child it unlocks. That child must directly depend on the enabler and come next in delivery order. Do not chain technical-enablement children.
-- Children link back to the parent in their `## Context` section.
-- Build and Verify run per sub-issue, so each completed child must leave the product in a coherent, demonstrable state. The parent reaches `status:verified` only when every child is `status:verified` and the parent's own top-level acceptance criteria pass.
-
-**Create children in two steps: `gh issue create`, then `gh sub-issue add`.**
-
-`gh sub-issue create` accepts only `--body string`. It has no `--body-file`, and passing one fails with `unknown flag: --body-file` without creating the issue. Spec bodies are multi-line Markdown, so they must go through `--body-file`. Create the issue normally, then attach it to the parent:
-
-```bash
-CHILD_URL=$(gh issue create \
-  --title "<user-observable outcome>" \
-  --body-file "$BODY" \
-  --label "kind:sub-spec,status:approved")
-CHILD="${CHILD_URL##*/}"          # gh issue create prints the URL, not JSON
-rm -f "$BODY"
-
-gh sub-issue add <N> "$CHILD"    # attach to the parent
-gh sub-issue list <N>            # inspect the hierarchy
+```
+save_issue({
+  "title": "<user-observable outcome>",
+  "team": "<team>",
+  "project": "<project>",
+  "state": "Backlog",
+  "parentId": "KAT-1000",
+  "description": "<child spec body>"
+})
 ```
 
-This produces the same native parent/child link as `gh sub-issue create` while preserving body fidelity. Never fall back to `--body` to make the one-step form work; it mangles backticks, quotes, and newlines.
-
-If the `gh sub-issue` extension is unavailable and the user does not want to install it, fall back to a `## Sub-issues` task list in the parent body (`- [ ] #143`) and keep it current by hand. State clearly in the report that native sub-issue links were not used.
-
-Do not nest more than one level. If a child needs decomposition, the parent scope was wrong; return to Plan.
-
-## Dependencies
-
-Sub-issue links express **composition** (this phase is part of that epic). They say nothing about **order**. When one issue cannot start until another is done, record it as a native GitHub dependency so the block is visible in the UI and queryable, rather than only as prose in `## Context`.
-
-This is built into `gh`; no extension is needed.
-
-```bash
-gh issue create --title "..." --body-file "$BODY" --blocked-by 143,144
-gh issue edit <N> --add-blocked-by 143      # N cannot start until 143 is done
-gh issue edit <N> --add-blocking 145        # N must finish before 145 starts
-gh issue edit <N> --remove-blocked-by 143   # dependency no longer holds
-gh issue view <N> --json number,title,blockedBy,blocking
+```
+save_issue({
+  "id": "KAT-1002",
+  "blockedBy": ["KAT-1001"]
+})
 ```
 
-Flags take comma-separated issue numbers or URLs, and work across repos by URL.
-
-Use a dependency when:
-
-- A slice consumes a schema, interface, migration, or endpoint that an earlier slice creates.
-- Two issues touch the same surface and would conflict if built in parallel.
-- An issue is waiting on an external decision tracked in another issue.
-
-Do not use one when:
-
-- The relationship is merely thematic, or the order is only a preference. Over-linking turns the graph into noise and hides real blocks.
-- The relationship is parent/child. That is `gh sub-issue add`, not a dependency. An epic is not "blocked by" its own slices.
-
-Rules:
-
-- A schema, interface, migration, endpoint, or component dependency does not by itself justify a standalone architecture child when the minimum work can live inside the first demonstrable slice. Record true blockers, but do not turn a preferred layer order into roadmap phases.
-- An approved technical-enablement child must be the direct `blockedBy` dependency of the immediate user-facing slice named in its exception. A chain of technical-only children is a decomposition defect.
-- Dependencies are advisory in GitHub; nothing prevents building a blocked issue. Treat an open blocker as a stop condition anyway, and say so rather than silently proceeding.
-- Keep them current. A `blockedBy` pointing at a `status:verified` or closed issue is stale and is a triage defect.
-- Prefer `--add-blocked-by` on the dependent issue over `--add-blocking` on the blocker. Both create the same edge, but consistently writing it from the dependent side keeps the intent readable.
-- A dependency cycle is a decomposition error. Return to Plan and re-cut the slices.
+Do not nest more than one level.
 
 ## Branches and pull requests
 
-- Branch name: `<issue-number>-<kebab-title>`, for example `142-export-workflow`. Derive it from the issue with `gh issue develop <N> --name <branch> --base <default>` when the user wants GitHub to link the branch to the issue.
-- One branch per spec issue or per sub-issue. Never build two issues on one branch.
-- **Verify opens the PR, not Build.** Build pushes the branch; Verify opens the PR once acceptance evidence exists, so the PR body carries the matrix and CI runs against verified work.
-- The PR body must contain `Closes #<N>` for the issue it implements. For a sub-issue, close the sub-issue, not the parent.
-- Link the PR back to the issue with a comment when the PR is opened from a branch GitHub did not auto-link.
+- Branch name is `gitBranchName` from `get_issue`. Resume that branch when it already exists.
+- One branch and one implementing PR per Linear issue. Every implementing PR names exactly one distinct Linear issue ID in its title or body.
+- Build opens a draft PR while the issue is In Progress.
+- `review` lands CI and review comments. Merge happens only after a fresh Merging-state check.
+- When a PR closes without merge, reconcile to Todo as specified above.
 
 ## Comments
 
-Post reports and evidence as issue comments, using a body file:
+Post reports as Linear comments:
 
-```bash
-gh issue comment <N> --body-file "$REPORT"
-rm -f "$REPORT"
+```
+save_comment({
+  "issueId": "KAT-1234",
+  "body": "## Build: acceptance criteria matrix\n..."
+})
 ```
 
 Conventions:
 
-- Build completion report: comment starting with `## Build completion report`.
+- Build evidence: comment starting with `## Build: acceptance criteria matrix`.
 - Verify evidence: comment starting with `## Verify: acceptance criteria matrix`.
 - Deviation approvals: comment starting with `## Approved deviation`.
 - Blocking reasons: comment starting with `## Blocked`.
-
-The issue plus its comments is the complete record for the work. A reader should be able to reconstruct scope, decisions, implementation, and acceptance from the issue alone.
-
-Image and video artifacts cannot be uploaded through `gh`. Reference their repo-relative or absolute paths in the comment, and tell the user which artifacts they may want to drag into the issue by hand.
+- Closed-PR reconciliation: comment starting with `## PR closed without merge`.
 
 ## Querying the roadmap
 
-```bash
-gh issue list --label kind:spec --state open --json number,title,labels,updatedAt
-gh issue list --label status:approved --state open          # ready to build
-gh issue list --label status:implemented --state open       # ready to verify
-gh issue list --label needs:acceptance-criteria --state open
-gh issue view <N> --json number,title,body,labels,state,comments,url
-gh search issues --repo <owner>/<repo> "<keywords>" --state open   # duplicate check
+```
+list_issues({ "team": "<team>", "project": "<project>", "state": "Todo" })
+list_issues({ "team": "<team>", "project": "<project>", "state": "In Progress" })
+list_issues({ "team": "<team>", "project": "<project>", "query": "<keywords>" })
+get_issue({ "id": "KAT-1234", "includeRelations": true })
 ```
 
-Before Plan creates a new spec issue, search for an existing issue covering the same work. Extend the existing issue instead of opening a duplicate.
+Search before Plan creates a new spec. Extend the existing issue when it already covers the work.
 
-## What migration leaves in the repo
+## Phase-entry hygiene
 
-After migration, `docs/specs/` holds no spec documents. It keeps only:
+At the start of Plan, Build, Review, and Verify, read the issue and **report** problems without fixing them:
 
-- `index.md`, a pointer stating the roadmap lives in GitHub Issues, with the queries needed to read it.
-- `log.md`, holding the dated migration receipt. This is a record of what the migration did, not a document to maintain going forward.
-- `archive/`, holding the original files with normalized frontmatter.
-
-### Archived spec frontmatter
-
-Every archived file carries the same normalized shape, so the frontmatter and the pointer line in the body always agree:
-
-| Key             | Value                                                                     |
-| --------------- | ------------------------------------------------------------------------- |
-| `type`          | The original `type`, or `Spec` when the source file had none.             |
-| `title`         | The original `title`, first `# ` heading, or a title derived from the name. |
-| `status`        | `Migrated` when the spec became an issue. `Completed` when archived as finished work. |
-| `source_status` | The status the file declared before the migration.                        |
-| `github_issue`  | The issue number. Present only when `status: Migrated`.                    |
-| `migrated`      | `true` for issue-backed specs, `false` for completed ones.                 |
-| `archived_at`   | UTC timestamp of the archive operation.                                   |
-
-The pre-migration status is preserved in `source_status` rather than left in `status`. Two keys with two different answers to "is this done" is worse than either answer alone.
-
-Use this content for `docs/specs/index.md`:
-
-````markdown
-# Specs
-
-Specs for this project are GitHub Issues. This directory holds no spec documents.
-
-## Read the roadmap
-
-```bash
-gh issue list --label kind:spec --state open            # all active specs
-gh issue list --label status:approved --state open      # approved, ready to build
-gh issue list --label status:implemented --state open   # built, awaiting verification
-gh issue view <N>                                       # read a spec
-gh sub-issue list <N>                                   # read an epic's slices
 ```
-
-## Status model
-
-| Label                | Meaning                                     |
-| -------------------- | ------------------------------------------- |
-| `status:draft`       | Being written or revised. Do not build.     |
-| `status:approved`    | Approved by the maintainer. Ready to build. |
-| `status:implemented` | Built and reported. Ready to verify.        |
-| `status:verified`    | Acceptance evidence accepted.               |
-| `status:blocked`     | Cannot proceed. See the issue body.         |
-
-## Writing and executing specs
-
-Use the `plan-build-verify` skill. It publishes specs as issues, runs Build against approved issues, and posts acceptance evidence back to the issue.
-
-## Archive
-
-Pre-migration spec files are preserved under [`archive/`](./archive/) with links to their issues. They are historical and are not maintained.
-````
-
-The migration script appends the previous index content below this pointer under a "Roadmap context carried over from the previous index" heading rather than discarding it. Reconcile that section against the GitHub roadmap and delete it once the active and deferred items exist as issues. Pass `--replace-index` only when the previous index holds nothing worth keeping.
-
-Add this to `AGENTS.md` during migration:
-
-```markdown
-## Specs live in GitHub Issues
-
-Specs for this repository are GitHub Issues, not files. `docs/specs/` holds only an index pointer and an archive of pre-migration specs.
-
-- Read the roadmap with `gh issue list --label kind:spec --state open`.
-- Read a spec with `gh issue view <N>`; read an epic's slices with `gh sub-issue list <N>`.
-- Do not create spec files under `docs/specs/`. Use the `plan-build-verify` skill, which publishes specs as issues.
-- Never build an issue that is not labeled `status:approved` without explicit maintainer approval.
-- Post build reports and acceptance evidence as comments on the spec issue.
-- ADRs remain files under `docs/adrs/`. Cross-link them with the issues they constrain.
-```
-
-## Phase-entry hygiene check
-
-At the start of Plan, Build, and Verify, run a lightweight check on the issues in scope and **report** problems without fixing them:
-
-```bash
-gh issue view <N> --json number,title,labels,body,state
+get_issue({ "id": "<id>", "includeRelations": true })
 ```
 
 Report when:
 
-- The issue has no `status:*` label, or more than one.
-- The `## Status` section disagrees with the `status:*` label (including leftover `Draft` when the label is `status:approved` or later). For Build, both the `status:*` label and `## Status` must be approved (or later). A Draft body blocks Build even if the label says approved; do not silently follow the label.
-- `phase:plan` remains after the issue has left Plan (`status:approved`, `status:implemented`, or `status:verified`).
-- `## Acceptance criteria` is missing, empty, or contains vague language.
-- A standalone spec or sub-spec has no independently exercisable `## Demonstration` through a human, operator, or API/SDK public interface, unless it documents a justified minimal technical-enablement exception and the immediate user-facing slice it unlocks.
-- An epic has no sub-issues, a sub-issue has no parent, or the children are architecture-layer work packages rather than demonstrable vertical slices.
-- A technical-enablement child does not directly block the immediate user-facing slice named in its exception, or another technical-only child intervenes.
-- The issue is closed but not `status:verified`.
-- The issue duplicates another open spec issue.
+- The state is missing from the required nine, or does not match the requested phase.
+- `## Acceptance criteria` is missing, empty, or vague.
+- A standalone spec or child has no independently exercisable `## Demonstration`, unless it documents a justified minimal technical-enablement exception.
+- An epic has no children, a child has no parent, or the children are architecture-layer work packages.
+- An open blocker remains.
+- The issue is Canceled or Duplicate.
+- The issue duplicates another open spec.
 
-State the findings in one short block, then continue with the requested phase unless a finding blocks it (missing acceptance criteria blocks Build and Verify; label/`## Status` disagreement or an unapproved status blocks Build). To fix hygiene problems across the backlog, run Triage.
+Missing acceptance criteria blocks Build, Review, and Verify. Unapproved work (still Backlog) blocks Build. Human Review without an explicit resume blocks coding, CI-fix, and review agents.
 
 ## Safety rules
 
-- Never close, delete, or bulk-relabel issues you did not open without user approval.
-- Never edit an issue body you have not read in full in this session.
+- Never close, delete, or bulk-relabel Linear issues you did not open without user approval.
+- Never edit an issue description you have not read in full in this session.
 - Never force-push or amend commits on a branch linked to an issue another agent or person is working on.
-- When a `gh` write fails, report the exact command and error. Do not retry silently and do not fall back to local files.
+- When a Linear MCP or `gh` write fails, report the exact tool or command and error. Do not retry silently and do not fall back to local spec files.
+- Never overwrite Human Review, Canceled, or Duplicate to continue coding.

@@ -3,4 +3,4 @@ name: build
 description: Run the plan-build-verify Build workflow
 ---
 
-Load and follow the `build` skill. Run the plan-build-verify Build workflow.
+Load and follow the `build` skill. Run the plan-build-verify Build workflow. Start from Todo, open a draft PR in In Progress, then confirm Agent Review.

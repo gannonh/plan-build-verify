@@ -16,9 +16,9 @@ SRC = ROOT / "src"
 SKILLS = (
     "plan",
     "build",
+    "review",
     "verify",
     "triage",
-    "ship",
 )
 HOSTS = ("cursor", "claude", "codex")
 GENERATED_TREES = tuple(ROOT / "plugins" / host for host in HOSTS)

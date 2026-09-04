@@ -1,244 +1,171 @@
-# Verify Workflow (GitHub)
+# Verify Workflow
 
-Use this workflow to validate completed implementation against the spec issue's acceptance criteria, publish the evidence, open the pull request, and drive it to green.
+Use this workflow to validate merged implementation against the spec issue's acceptance criteria and publish the evidence on the Linear issue.
 
-Verify is the third phase in Plan → Build → Verify. It produces acceptance evidence, durable acceptance tests, a pull request, a converged CI and review state, and a signoff recommendation. Read `references/conventions.md` before starting.
+Verify starts after Done. Read `references/conventions.md` before starting.
 
 ## Autonomy contract
 
-**Verify runs autonomously from entry until the stop condition.** Build enters this workflow directly without asking. Do not pause between steps to request permission, and do not hand control back after a single push or a single CI snapshot.
+**Verify runs autonomously from entry until the result comment is posted.** Do not pause between steps to request permission.
 
 Run without asking:
 
-- Capturing evidence and writing acceptance tests.
-- Opening the PR.
-- Diagnosing CI failures, fixing branch-related ones, committing, and pushing.
-- Fixing valid review feedback from any reviewer, human or bot.
-- Replying to and resolving review threads, human or bot.
-- Re-entering the watch loop after every push.
+- Confirming the relevant PR merged.
+- Checking out or fetching the merged default branch.
+- Capturing evidence and recording the matrix.
+- Opening or reusing Backlog follow-up issues for failed criteria.
 
-**The stop condition is: CI green on the current head SHA, every review thread resolved or answered, no merge conflict, and the acceptance matrix complete.** On reaching it, stop and present the matrix for signoff. Do not merge; the user owns the merge decision (Step 9).
-
-Stop early only for the conditions in "Stop and ask" at the end of this file. A push is never a terminal state. A single green snapshot while checks are still queued is never a terminal state.
+Stop after the Linear result comment. Failed follow-ups require human Todo approval before Build.
 
 ## Step 1: Gather inputs
 
+```
+get_issue({
+  "id": "<id>",
+  "includeRelations": true
+})
+list_comments({
+  "issueId": "<id>"
+})
+```
+
 ```bash
-gh issue view <N> --json number,title,body,labels,state,url,comments
-gh sub-issue list <N>          # if the issue is an epic
-gh pr list --search "<N>" --state all --json number,title,state,url
+gh pr list --search "<issue-id>" --state merged --json number,title,state,mergedAt,mergeCommit,url
+gh pr view <N> --json number,state,mergedAt,mergeCommit,url,title,body
 ```
 
 Collect:
 
-- The spec issue, ideally labeled `status:implemented`.
-- The acceptance criteria checkbox list from the issue body.
-- The Build completion report comment.
-- The branch or PR to verify.
+- The spec issue in Done, or a parent that auto-closed after its last child closed.
+- The acceptance criteria checkbox list from the issue description.
+- The Build matrix comment, if present.
+- The merged PR and merge commit.
 
-Run the phase-entry hygiene check from `references/conventions.md` and report findings. If acceptance criteria are missing or ambiguous, stop, add `needs:acceptance-criteria`, and return to Plan.
+Run the phase-entry hygiene check from `references/conventions.md` and report findings. If acceptance criteria are missing or ambiguous, stop and return to Plan via a Backlog follow-up. Leave the original issue Done.
 
-Mark the phase:
+If the issue is not Done, stop. Verify does not run against In Progress, Agent Review, Human Review, or Merging.
+
+For an automatically closed parent, collect its children with `list_issues` using `parentId` and follow Step 7. The parent does not need its own implementing PR. For a leaf issue with no merged PR naming it, record that failure in the result comment and open a Backlog follow-up. Auto-close of a parent is not merge evidence.
+
+## Step 2: Work from merged state
+
+Fetch the default branch and inspect the worktree first. Use a separate worktree at the merge commit when local work must be preserved. Confirm the commit belongs to the fetched default branch. Do not verify the pre-merge feature branch.
 
 ```bash
-gh issue edit <N> --add-label "phase:verify"
+git fetch origin <default-branch>
+git merge-base --is-ancestor <merge-commit> origin/<default-branch>
+git switch --detach <merge-commit>
 ```
 
-If the user asks for UAT, signoff, merge readiness, or proof that work is complete, start here.
+## Step 3: Verify against acceptance criteria
 
-## Step 2: Verify against acceptance criteria
-
-**Look for a project-local `verify-*` skill first** (slash form `/verify-<app>`). That is the pstack-generated drive path for launching and exercising the real app.
+**Look for a project-local `verify-*` skill first** (slash form `/verify-<app>`).
 
 1. Search for a skill named `verify-*`. Typical locations: `.cursor/skills/verify-*/SKILL.md`, then any installed skills path that matches `verify-*`.
 2. If several match, pick the one whose description matches the app under test; if still ambiguous, ask once.
-3. If found: read that `SKILL.md` completely. Use its Launch, Doctor, Drive, Evidence, and Cleanup sections to start the app, doctor-check it, drive the changed feature(s) against the issue's acceptance criteria, and capture evidence. Use the feature map under that skill when deciding what to drive.
-4. Whether or not a `verify-*` skill exists, read `references/user-acceptance/workflow.md` completely and follow it for the PBV evidence contract: matrix shape, `uat-evidence/`, UAT reporting, adversarial review, hard gates, and scripts under `scripts/user-acceptance/`. Map verify-* artifacts into that layout when practical; do not skip the matrix because a verify skill ran.
-5. If none found: drive the app with the bundled user-acceptance playbooks only. Do not generate a verification skill during Verify. You may note that pstack's `/create-verification-skill` can create one later.
+3. If found: read that `SKILL.md` completely. Use its Launch, Doctor, Drive, Evidence, and Cleanup sections against the merged code.
+4. Reuse Build's evidence contract. Resolve paths against the sibling `build` skill directory:
 
-- Use an explicit **acceptance-criteria matrix** in the final report.
-- Each criterion shows the verification method, result (`Pass`, `Fail`, `Blocked`, or `Not tested`), and evidence path or note. This keeps Verify tied to the approved scope instead of producing only a general UAT summary.
+```text
+<plugin-root>/skills/build/references/user-acceptance/workflow.md
+<plugin-root>/skills/build/scripts/user-acceptance/
+```
 
-Evidence artifacts land under `uat-evidence/<target>-<timestamp>/` as described in that workflow. They stay on disk; `gh` cannot upload binaries to an issue. Reference their paths in the comment and tell the user which artifacts are worth attaching by hand.
+Read that workflow completely. Use `init-evidence.mjs`, `run-capture-command.mjs`, `write-report.mjs`, and `verify-evidence.mjs` from the Build skill. Map verify-* artifacts into that layout when practical.
 
-## Step 3: Write durable acceptance tests
+5. If none found: drive the app with those bundled playbooks only. Do not generate a verification skill during Verify.
 
-Evidence proves the criteria pass **now**. Tests keep them passing. Before opening the PR, confirm Build checked in at least one end-to-end test per user-facing slice through its real public interface; if it did not, return to Build and add the missing test before continuing.
+- Use an explicit **acceptance-criteria matrix** in the final Linear comment.
+- Each criterion shows the verification method, result (`Pass`, `Fail`, `Blocked`, or `Not tested`), and evidence path or note.
 
-- The required test exercises UI, CLI, API, SDK, or operator behavior and asserts the slice's observable result. A repository may call it a system or integration test; it counts only when it crosses the public boundary rather than testing internal units.
-- Record the passing evidence run with `run-capture-command.mjs --kind e2e`. An approved technical-enablement exception uses a contract/integration test recorded with `--kind contract`.
-- Add further automated coverage for every acceptance criterion that can be automated.
-- Name each test so the slice or criterion it covers is obvious, and reference the issue number in the test file or describe block.
-- Follow the repo's existing test layout and runner. Read `references/tdd/tests.md` for the standard on test quality.
-- Run the full suite locally and make it pass before the PR exists. Opening a PR with a known-red suite wastes a CI cycle.
-
-A visual, hardware, or third-party criterion may still need manual evidence in addition to the required slice-level E2E test. Record it in the matrix with method `Manual` and say why that criterion cannot be automated. Do not write a hollow test that asserts nothing just to fill the row.
-
-If no viable E2E path can run after one focused setup or repair attempt, mark the slice `Blocked` and stop at the evidence report. Do not spin on harness setup or replace the test with screenshots. These tests are part of the branch and are pushed with it; they make CI in Step 7 a real gate rather than a formality.
+Evidence artifacts land under `uat-evidence/<target>-<timestamp>/`. Reference their paths in the comment.
 
 ## Step 4: Adversarial evidence review
 
-- Task a subagent to verify the `uat-evidence` and the new tests against the issue's acceptance criteria.
-- Give the subagent the issue number so it can read the criteria with `gh issue view <N>` rather than trusting your summary.
+- Task a subagent to verify the `uat-evidence` and tests against the issue's acceptance criteria.
+- Give the subagent the issue identifier so it can read the criteria with `get_issue`.
 - The subagent must not have produced the evidence it reviews.
-- Fill in any gaps before posting the report. Gaps found here are cheaper than gaps found by a reviewer on the PR.
+- Fill in any gaps before posting the report.
 
 ## Step 5: Post the acceptance evidence
 
-```bash
-MATRIX="$(mktemp "${TMPDIR:-/tmp}/pbv-verify.XXXXXX.md")"
-# write the report to "$MATRIX"
-gh issue comment <N> --body-file "$MATRIX"
-rm -f "$MATRIX"
+Create or locate failed-AC follow-ups using Step 6 before posting, so the result comment includes their links. Then post once and stop.
+
+```
+save_comment({
+  "issueId": "<id>",
+  "body": "## Verify: acceptance criteria matrix\n..."
+})
 ```
 
 Start the comment with `## Verify: acceptance criteria matrix` and include:
 
-- Scope line naming the branch, PR, or commit range verified.
+- Scope line naming the merged PR, merge commit, and default branch.
 - The matrix: criterion, method, result, evidence path.
 - Totals (`6 Pass / 0 Fail / 1 Blocked`).
 - Failures and blocked items with what would unblock them.
+- Links to follow-up Backlog issues for each failed criterion.
 - Unrelated validation failures, separated from in-scope failures.
 - Manual run instructions a human can follow.
-- Recommendation line: `Pending user sign-off` until the user accepts.
 
-## Step 6: Open the pull request
+Leave the original issue in Done.
 
-Evidence exists and the matrix is posted, so the PR can carry proof from the moment it opens.
+## Step 6: Follow-up issues for failed criteria
 
-```bash
-PR_BODY="$(mktemp "${TMPDIR:-/tmp}/pbv-pr.XXXXXX.md")"
-# write the PR body to "$PR_BODY"
-gh pr create \
-  --base <default-branch> \
-  --head <branch> \
-  --title "<issue title>" \
-  --body-file "$PR_BODY"
-rm -f "$PR_BODY"
+For each failed AC, create or reuse a linked Backlog issue containing the failure, scoped spec, AC, and evidence:
+
+```
+list_issues({
+  "team": "<team>",
+  "project": "<project>",
+  "query": "<failure keywords>",
+  "state": "Backlog"
+})
 ```
 
-The PR body must contain:
+Reuse an existing follow-up when it already covers the same failure. Otherwise:
 
-- `Closes #<N>` for the issue being implemented. For a sub-issue, close the sub-issue, not the parent.
-- The acceptance-criteria matrix, or a link to the issue comment holding it.
-- Scope, tasks completed, approved deviations, and the verification commands run.
-- A link to the Build completion report comment.
-
-If the repo merges without PRs, skip this step and Step 7, and say so.
-
-## Step 7: Land the PR
-
-Load the sibling `ship` skill and follow it. Ship owns landing. That means settled-red CI and unanswered review comments from humans and bots.
-
-Ship calls `npx agent-reviews` ([pbakaus/agent-reviews](https://github.com/pbakaus/agent-reviews)) to list, filter, reply, and watch. That CLI is a runtime dependency. Do not vendor it. Do not add it to a package.json. Do not paginate review comments with raw `gh`.
-
-After ship reports the PR is landed on the current head SHA, confirm the acceptance matrix still has no `Fail` rows, then continue to Step 8.
-
-A green snapshot while checks are still running is not an exit. Re-poll and confirm.
-
-Stop the landing loop and report when ship aborts, or when a reviewer asks for a change that contradicts the issue's acceptance criteria. That is a spec conflict. Record it, stop, and return to Plan rather than quietly changing approved scope.
-
-### Reporting cadence
-
-Post progress updates, not a final summary, while the loop runs. Summarize status changes rather than every poll. Emit one update when CI first goes green on a SHA. Treat pushes, reruns, and resolved threads as progress, never as completion.
-
-When the loop exits, update the issue with a `## Verify: convergence report` comment covering the final SHA, check results, commits pushed during convergence, the review ledger with each item's disposition, and flaky retries used.
-
-## Step 8: Check off the acceptance criteria
-
-For each criterion that passed, check its box in the issue body so the issue shows live acceptance progress:
-
-```bash
-BODY="$(mktemp "${TMPDIR:-/tmp}/pbv-body.XXXXXX.md")"
-gh issue view <N> --json body -q .body > "$BODY"
-# flip "- [ ]" to "- [x]" for passing criteria only
-gh issue edit <N> --body-file "$BODY"
-rm -f "$BODY"
+```
+save_issue({
+  "title": "<failed criterion>",
+  "team": "<team>",
+  "project": "<project>",
+  "state": "Backlog",
+  "relatedTo": ["<original-id>"],
+  "description": "<failure, scoped spec, AC, and evidence>"
+})
 ```
 
-Rules:
+Link every follow-up identifier in the original issue's result comment. The follow-up requires human Todo approval before Build.
 
-- Only check criteria with evidence in the matrix. A criterion checked without evidence is a false acceptance record.
-- Leave failing, blocked, and untested criteria unchecked.
-- Never edit the wording of a criterion during Verify. If a criterion is wrong, say so and return to Plan.
+## Step 7: Automatically closed parents
 
-## Step 9: Signoff
+When a parent auto-closed because its last child closed:
 
-**This is the first point since Build where the workflow stops for the user.** Everything before it ran unattended.
+1. Confirm each child's relevant PR actually merged. Identify one merged default-branch revision containing all child merges and use it for aggregate proof.
+2. Confirm each child's AC matrix, or verify the parent's top-level criteria directly against merged code.
+3. Post an aggregate `## Verify: acceptance criteria matrix` on the parent.
+4. Open Backlog follow-ups for any parent criterion that failed.
 
-Present:
-
-- The acceptance-criteria matrix with totals.
-- PR link, final head SHA, and CI state.
-- The review ledger: what was fixed, what was declined and why.
-- Required evidence status: E2E/contract result, screenshot paths for visual targets, and video path or standardized skip reason.
-- Anything left manual or unverifiable.
-
-Wait for explicit acceptance. Do not self-accept, and do not merge. Merging is the user's decision even when everything is green.
-
-Once the user accepts:
-
-```bash
-gh issue edit <N> \
-  --remove-label "status:implemented,phase:verify" \
-  --add-label "status:verified"
-```
-
-Update the body's `## Status` section to `Verified` with a `Verified: <ISO 8601 datetime>` line.
-
-Close the issue, unless a merged PR already closed it:
-
-```bash
-gh issue close <N> --comment "Verified and accepted. See the acceptance criteria matrix above."
-```
-
-If the user does not accept, leave the issue at `status:implemented`, record what is missing in the comment, and return to Build for the failing criteria.
-
-## Step 10: Epic rollup
-
-When the verified issue is a sub-issue:
-
-1. Comment on the parent linking the child's matrix.
-2. Check the parent's own acceptance criteria only when a parent-level criterion is genuinely satisfied by the child's evidence.
-3. Clear the dependency edges this work unblocked. A verified issue should no longer block anything:
-
-```bash
-gh issue view <N> --json blocking          # what was waiting on this
-gh issue edit <DEPENDENT> --remove-blocked-by <N>
-```
-
- Leaving stale `blockedBy` edges makes the next Build stop on a blocker that is already done.
-
-4. Run `gh sub-issue list <PARENT>` and check whether every child is `status:verified`.
-5. If all children are verified, verify the parent's top-level acceptance criteria directly, then transition the parent to `status:verified` and close it.
-6. If children remain, **continue autonomously into the next one.** Pick the first `status:approved` sibling with no open blockers, announce the choice, and re-enter `references/build.md` for it in the same session. Do not ask permission to continue the epic.
-
-Stop and hand back only when no sibling is ready, when every remaining sibling is blocked, or when a "Stop and ask" condition applies.
-
-Do not mark a parent verified because its children are done. The parent's own criteria still need evidence.
+Auto-close is not evidence that code merged or AC landed.
 
 ## Stop and ask
 
-These override the autonomy contract. Stop and hand back to the user when:
+Stop and hand back to the user when:
 
-- The spec issue cannot be found or is not `status:implemented`.
+- The spec issue cannot be found or is not Done and is not an auto-closed parent.
 - Acceptance criteria are missing or ambiguous.
 - Required credentials, services, or devices are unavailable.
 - Verification would run destructive commands.
-- The branch has unrelated changes that make evidence unreliable.
-- The issue was already closed without a verification record.
-- A reviewer requests a change that contradicts approved acceptance criteria.
-- The landing loop in Step 7 hit a ship abort condition.
-- A fix would require force-pushing over commits you did not create, or otherwise rewriting shared history.
-
-Everything else is in scope to resolve without asking.
+- The worktree has unrelated changes that make evidence unreliable.
+- No merged PR can be identified for the issue.
 
 ## Never
 
-- Merge the PR. Signoff is the user's.
+- Merge a pull request.
+- Open a pull request.
+- Move the original issue out of Done because AC failed.
 - Check off a criterion without evidence in the matrix.
 - Edit the wording of an acceptance criterion to make it pass.
-- Change tests, CI configuration, or dependency pins to hide an unrelated failure.
-- Drop a review comment without a posted disposition.
-- Paginate review comments with raw `gh`. Use `npx agent-reviews` through the `ship` skill.
-- End the turn with the landing loop unfinished and no abort condition reached.
+- Treat parent auto-close as merge proof.
+- Start Verify from Agent Review, Human Review, or Merging.
