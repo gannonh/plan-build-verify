@@ -10,7 +10,7 @@ SCRIPTS = (
     Path(__file__).resolve().parents[1]
     / "src"
     / "skills"
-    / "verify"
+    / "build"
     / "scripts"
     / "user-acceptance"
 )
@@ -80,11 +80,11 @@ def create_evidence(
     technical_enablement = None
     if mode == "technical-enablement" and include_technical_approval:
         technical_enablement = {
-            "approval_ref": "https://github.com/acme/widgets/issues/1#issuecomment-1",
+            "approval_ref": "https://linear.app/kata-sh/issue/KAT-1#comment-1",
             "blocker": "The external contract must exist before the UI slice can start.",
             "minimum_scope": "Publish the bounded contract.",
             "unlocked_slice": "User completes the widget flow.",
-            "dependency_ref": "https://github.com/acme/widgets/issues/2",
+            "dependency_ref": "https://linear.app/kata-sh/issue/KAT-2",
         }
 
     manifest = {
@@ -119,6 +119,22 @@ def verify(evidence: Path) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
     )
+
+
+def test_report_uses_linear_workflow_without_extra_approval_gate(tmp_path: Path) -> None:
+    evidence = create_evidence(tmp_path / "evidence", target="cli", visual=False)
+    result = subprocess.run(
+        ["node", str(SCRIPTS / "write-report.mjs"), "--evidence", str(evidence)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    report = (evidence / "evidence.md").read_text(encoding="utf-8")
+    assert "Linear workflow states" in report
+    assert "accept / reject" not in report
+    assert "Pending user sign-off" not in report
+    assert verify(evidence).returncode == 0
 
 
 def test_visual_evidence_accepts_e2e_checkpoints_and_bounded_video_skip(tmp_path: Path) -> None:
@@ -200,7 +216,7 @@ def test_technical_enablement_requires_approved_exception_metadata(tmp_path: Pat
     assert "technical_enablement needs approval_ref" in result.stderr
 
 
-def test_technical_enablement_requires_github_approval_provenance(tmp_path: Path) -> None:
+def test_technical_enablement_requires_linear_approval_provenance(tmp_path: Path) -> None:
     evidence = create_evidence(
         tmp_path / "evidence",
         target="api",
@@ -218,7 +234,7 @@ def test_technical_enablement_requires_github_approval_provenance(tmp_path: Path
     result = verify(evidence)
 
     assert result.returncode == 1
-    assert "approval_ref must be a GitHub issue" in result.stderr
+    assert "approval_ref must be a Linear issue URL" in result.stderr
 
 
 def test_technical_enablement_accepts_contract_with_approval_metadata(tmp_path: Path) -> None:

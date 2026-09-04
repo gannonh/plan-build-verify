@@ -5,13 +5,13 @@
     "email": "gannonhall@gmail.com"
   },
   "metadata": {
-    "description": "Plan, Build, and Verify as a product OS. Specs live as GitHub Issues."
+    "description": "Plan, Build, Review, and Verify as a product OS. Specs live as Linear issues."
   },
   "plugins": [
     {
       "name": "plan-build-verify",
       "source": "plugins/cursor",
-      "description": "Plan, Build, and Verify as a product OS. Specs live as GitHub Issues."
+      "description": "Plan, Build, Review, and Verify as a product OS. Specs live as Linear issues."
     }
   ]
 }

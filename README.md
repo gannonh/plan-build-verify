@@ -1,10 +1,8 @@
 # plan-build-verify
 
-Plan, Build, and Verify as a Cursor, Claude Code, and Codex plugin. Specs live in GitHub Issues. This repository is the canonical source for plugin version **0.1.0**.
+Plan, Build, Review, and Verify as a Cursor, Claude Code, and Codex plugin. Specs live in Linear. GitHub Issues are inbound reports. This repository is the canonical source for plugin version **0.2.0**.
 
-Epic: [Install plan-build-verify as a Cursor, Claude, and Codex plugin](https://github.com/gannonh/plan-build-verify/issues/1).
-
-pstack stays a separate Cursor plugin. This plugin owns specs, labels, and Plan / Build / Verify.
+Project: [Plan Build Verify](https://linear.app/kata-sh/project/plan-build-verify-415bb335f84b). Import historical GitHub issues with Linear's native importer.
 
 Cursor and Claude marketplace listings are submitted but not public yet. Use the install steps below until live listing URLs are available.
 
@@ -18,9 +16,9 @@ Copy the generated Cursor tree into the local plugin directory:
 cp -R plugins/cursor ~/.cursor/plugins/local/plan-build-verify
 ```
 
-Enable **Allow Local Plugin Imports**, then enable `plan-build-verify`. The plugin details should list skills `plan`, `build`, `verify`, `triage`, and `ship` plus agents `plan-agent`, `build-agent`, and `verify-agent`. Commands `/plan`, `/build`, and `/verify` load the matching skill.
+Enable **Allow Local Plugin Imports**, then enable `plan-build-verify`. The plugin details should list skills `plan`, `build`, `review`, `verify`, and `triage` plus agents `plan-agent`, `build-agent`, and `verify-agent`. Commands `/plan`, `/build`, and `/verify` load the matching skill.
 
-Team marketplace import is Teams/Enterprise only and is not the Verify gate.
+The pre-PR check uses an isolated local import. Team marketplace import requires Teams/Enterprise.
 
 ### Claude Code
 
@@ -38,7 +36,7 @@ codex plugin marketplace add gannonh/plan-build-verify
 codex plugin add plan-build-verify@plan-build-verify
 ```
 
-Codex binds `.agents/plugins/marketplace.json` first, so the installed tree is `plugins/codex`. That tree ships skills `plan`, `build`, `verify`, `triage`, and `ship`. It has no `agents/` or `commands/` directory.
+Codex binds `.agents/plugins/marketplace.json` first, so the installed tree is `plugins/codex`. That tree ships skills `plan`, `build`, `review`, `verify`, and `triage`. It has no `agents/` or `commands/` directory.
 
 If a sparse checkout is used, it must be:
 
@@ -50,7 +48,7 @@ Do not use `--sparse .agents/plugins` alone. That omits `plugins/codex`.
 
 ## Runtime dependency
 
-The `ship` skill lands a PR. It calls [`npx agent-reviews`](https://github.com/pbakaus/agent-reviews) to list, filter, reply, and watch review comments (human and bot). Node.js 18+ is required at runtime. This repository does not vendor `agent-reviews` and does not add it to a package.json. `npx` fetches the published CLI when the skill runs.
+The `review` skill lands a PR during Agent Review. It calls [`npx agent-reviews`](https://github.com/pbakaus/agent-reviews) to list, filter, reply, and watch review comments (human and bot). Node.js 18+ is required at runtime. This repository does not vendor `agent-reviews` and does not add it to a package.json. `npx` fetches the published CLI when the skill runs.
 
 ## Build
 
@@ -69,7 +67,7 @@ That command writes:
 - `.claude-plugin/marketplace.json` (`source`: `./plugins/claude`)
 - `.agents/plugins/marketplace.json` (`source.path`: `./plugins/codex`)
 
-Skill bodies are copied from `src/skills/*/SKILL.md`. Do not edit files under `plugins/` by hand. Bump `version` in `src/manifests/` when skill bodies or generated manifests change. The first ship is `0.1.0`.
+Skill bodies are copied from `src/skills/*/SKILL.md`. Do not edit files under `plugins/` by hand. Bump `version` in `src/manifests/` when skill bodies or generated manifests change. This release is `0.2.0`.
 
 ## How CI proves the trees
 
@@ -92,7 +90,7 @@ claude plugin validate ./plugins/claude --strict
 - The Codex tree has `agents/` or `commands/`, or `.codex-plugin/` contains any file other than `plugin.json`.
 - The Codex catalog is missing required `name`, `source`, `policy.installation`, `policy.authentication`, or `category` fields.
 
-Ported pack unit tests cover migrate helpers and user-acceptance evidence scripts. Those tests live in `tests/` and are not copied into the plugin trees.
+Ported pack unit tests cover user-acceptance evidence scripts and generated-tree contracts. Those tests live in `tests/` and are not copied into the plugin trees.
 
 ## License
 

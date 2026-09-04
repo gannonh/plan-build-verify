@@ -41,7 +41,7 @@ def run_control(*args: str, env: dict[str, str] | None = None) -> subprocess.Com
     )
 
 
-def write_run_json(run_dir: Path, *, version: str = "0.1.0", **overrides: str) -> None:
+def write_run_json(run_dir: Path, *, version: str = "0.2.0", **overrides: str) -> None:
     payload = {
         "run_id": run_dir.name,
         "repo": str(REPO),
@@ -121,8 +121,8 @@ def test_load_run_binds_paths_to_selected_directory(control_pbv, evidence_base: 
     assert run.home_path == (run_dir / "home").resolve()
     assert run.evidence_path == (run_dir / "evidence").resolve()
     assert run.cursor_install == str((run_dir / "home" / ".cursor" / "plugins" / "local" / "plan-build-verify").resolve())
-    assert run.claude_install.endswith("plan-build-verify/0.1.0")
-    assert run.codex_install.endswith("plan-build-verify/0.1.0")
+    assert run.claude_install.endswith("plan-build-verify/0.2.0")
+    assert run.codex_install.endswith("plan-build-verify/0.2.0")
 
 
 def test_cleanup_only_removes_bound_home(control_pbv, evidence_base: Path) -> None:
@@ -181,7 +181,7 @@ def test_drive_claude_validates_repository_tree_and_isolated_copy(control_pbv, t
         cursor_install=str(tmp_path / "home" / "cursor"),
         claude_install=str(install),
         codex_install=str(tmp_path / "home" / "codex"),
-        version="0.1.0",
+        version="0.2.0",
     )
     calls: list[list[str]] = []
 

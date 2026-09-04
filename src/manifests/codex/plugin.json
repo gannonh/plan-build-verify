@@ -1,7 +1,7 @@
 {
   "name": "plan-build-verify",
-  "version": "0.1.0",
-  "description": "Plan, Build, and Verify as a product OS. Specs live as GitHub Issues.",
+  "version": "0.2.0",
+  "description": "Plan, Build, Review, and Verify as a product OS. Specs live as Linear issues.",
   "author": {
     "name": "Gannon Hall",
     "email": "gannonhall@gmail.com",
@@ -14,7 +14,8 @@
     "plan",
     "build",
     "verify",
-    "github-issues",
+    "linear",
+    "review",
     "specs"
   ],
   "skills": "./skills/",

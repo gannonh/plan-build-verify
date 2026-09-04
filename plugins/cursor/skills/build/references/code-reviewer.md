@@ -5,7 +5,7 @@ Use this compact rubric only when no compatible installed code-review skill is a
 ## Inputs to provide
 
 - Description of what changed.
-- Spec path and task ID.
+- Spec issue identifier and task ID.
 - Task text, requirements, and acceptance criteria.
 - Base SHA and head SHA.
 - Test and verification evidence.

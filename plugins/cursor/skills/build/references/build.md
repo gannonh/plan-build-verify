@@ -1,13 +1,13 @@
-# Build Workflow (GitHub)
+# Build Workflow
 
-Use this workflow to execute an approved spec issue through small implementation tasks, review gates, and verified completion.
+Use this workflow to execute an approved Linear spec issue through small implementation tasks, review gates, pre-merge acceptance, and a draft pull request.
 
-Build is the second phase in Plan → Build → Verify. It starts from a GitHub Issue labeled `status:approved`. Read `references/conventions.md` before starting.
+Build starts from Todo after an explicit start. Read `references/conventions.md` before starting.
 
 ## Required inputs
 
-- Spec issue number or URL. For an epic, the specific sub-issue to build.
-- `status:approved` label on that issue, or explicit user override.
+- Spec issue identifier. For an epic, the specific child to build.
+- Todo (explicit start) or In Progress (resume), or explicit user override.
 - `## Acceptance criteria` section with observable pass/fail outcomes.
 - `## Build handoff` section with scope, non-goals, ordered slices, verification commands, and blocking open questions.
 - A `## Demonstration` section naming the consumer, action/input, observable result, and evidence. An approved technical-enablement exception instead names its blocker, minimum scope, contract/integration evidence, and immediate user-facing slice unlocked.
@@ -27,49 +27,59 @@ Implementation tasks must use the bundled TDD workflow before writing production
 
 Before editing files:
 
-1. Run the `gh` preflight from `references/conventions.md`.
+1. Run the preflight from `references/conventions.md`.
 2. Read the issue completely:
 
-```bash
-gh issue view <N> --json number,title,body,labels,state,url,comments,blockedBy,blocking
-gh sub-issue list <N>    # if the issue is an epic
+```
+get_issue({
+  "id": "<id>",
+  "includeRelations": true
+})
 ```
 
-3. **Check `blockedBy` before writing any code.** If a blocker is still open, stop and report it. Do not start a blocked issue unless the user explicitly acknowledges the blocker and chooses to proceed. If a blocker is already closed or `status:verified`, the edge is stale: clear it with `gh issue edit <N> --remove-blocked-by <BLOCKER>` and say so.
-4. Confirm the issue carries `status:approved` and the body's `## Status` section says `Approved`, or confirm the user explicitly overrode the approval gate. Both must be approved (or later). A Draft body is unapproved even if the label is `status:approved`. If the label and the body disagree, stop; do not write code and do not rewrite either side to unblock yourself.
-5. **If the issue is an epic** (`kind:epic`), do not build the parent. Pick the first `status:approved` child with no open blockers. Read the graph rather than assuming the order:
+3. **Check `blockedBy` before writing any code.** If a blocker is still open, comment with the exact ask and stop. Do not start a blocked issue unless the user explicitly acknowledges the blocker and chooses to proceed. A Done blocker no longer blocks Build; preserve the dependency for traceability. Use `removeBlockedBy` only for a relation confirmed to be incorrect. A Canceled or Duplicate blocker requires checking whether its prerequisite was delivered or replaced.
+4. Confirm the issue is Todo or In Progress, or confirm the user explicitly overrode the approval gate. Backlog is unapproved. Human Review, Canceled, and Duplicate are stop conditions.
+5. **If the issue has children**, do not build the parent. Pick the first Todo child with no open blockers:
 
-```bash
-for c in $(gh sub-issue list <N> --json number | jq -r '.[].number'); do
-  gh issue view "$c" --json number,title,labels,state,blockedBy,blocking
-done
+```
+list_issues({
+  "team": "<team>",
+  "project": "<project>",
+  "parentId": "<id>"
+})
 ```
 
 If several are ready, ask which to build or confirm the order. State the choice before proceeding.
 
-6. Confirm the issue contains `## Acceptance criteria` with concrete checkbox criteria. If missing or ambiguous, add `needs:acceptance-criteria`, stop, and return to Plan to fix the issue.
-7. Confirm `## Demonstration` describes behavior that can be exercised after this issue alone. If it depends on unfinished sibling layers before anything is observable, stop and return to Plan to re-slice the work. A documented minimal technical-enablement exception may proceed only when it records the blocker, minimum scope, contract/integration evidence, and immediate user-facing slice it unlocks, and that slice directly depends on this issue.
+6. Confirm the issue contains `## Acceptance criteria` with concrete checkbox criteria. If missing or ambiguous, stop and return to Plan.
+7. Confirm `## Demonstration` describes behavior that can be exercised after this issue alone.
 8. Run the phase-entry hygiene check from `references/conventions.md` and report findings.
 9. Inspect repo instructions such as `AGENTS.md`, `CLAUDE.md`, and README command sections.
 10. Check worktree state with `git status --short --branch`.
 11. Confirm `Blocking open questions` is `None`, or confirm the user explicitly approved proceeding with listed questions.
-12. Create or check out the working branch:
+12. Create or check out the working branch using `gitBranchName` from `get_issue`. Resume that branch when it already exists.
 
 ```bash
-gh issue develop <N> --name "<N>-<kebab-title>" --base <default-branch> --checkout
+git switch -c "<gitBranchName>"
 ```
 
-Use plain `git switch -c <N>-<kebab-title>` if `gh issue develop` is unavailable or the repo blocks it. Do not start implementation on `main` or `master` without explicit user consent.
+Use `git switch "<gitBranchName>"` when the branch already exists. Do not start implementation on `main` or `master` without explicit user consent.
 
 13. Capture a base SHA with `git rev-parse HEAD`.
 14. Identify verification commands from the issue's `## Build handoff` and `## Verification` sections plus repo scripts.
 15. Confirm required tools are available: todo tracking and subagent dispatch if using the subagent path.
-16. Move the issue into the Build phase:
+16. On an explicit start from Todo, move the issue to In Progress using the state-write protocol in `references/conventions.md`:
 
-```bash
-gh issue edit <N> --add-label "phase:build"
-gh issue comment <N> --body "Build started on branch \`<branch>\` at base SHA \`<sha>\`."
 ```
+get_issue({ "id": "<id>", "includeRelations": true })
+save_issue({ "id": "<id>", "state": "In Progress" })
+save_comment({
+  "issueId": "<id>",
+  "body": "Build started on branch `<branch>` at base SHA `<sha>`."
+})
+```
+
+Skip the state write when the issue is already In Progress.
 
 Stop and ask if the issue is unapproved, the worktree has unrelated changes, the branch is unsafe, required tools are missing, or the issue has blocking questions.
 
@@ -77,7 +87,7 @@ Stop and ask if the issue is unapproved, the worktree has unrelated changes, the
 
 Extract implementation tasks from the issue's `## Delivery slices` and `## Build handoff` sections. Preserve the full task text, context, files, acceptance criteria, demonstration path, required public-boundary E2E/contract test, screenshot checkpoints, and verification commands.
 
-Implementation tasks inside a slice may follow technical layers, but the selected issue must finish end to end. Do not stop after a storage, backend, protocol, or UI layer while claiming the slice is implemented.
+Implementation tasks inside a slice may follow technical layers, but the selected issue must finish end to end.
 
 Create todo items for all tasks when a todo tool is available. Keep exactly one implementation task in progress at a time.
 
@@ -95,18 +105,18 @@ For each task, dispatch a fresh implementer subagent using `references/implement
 
 Give the subagent:
 
-- Issue number and URL.
+- Issue identifier and URL.
 - The relevant issue body sections, pasted into the prompt.
 - Task ID and full task text.
 - Acceptance criteria for the task.
-- Slice target: consumer, action/input, observable result, and demonstration/evidence. For approved technical enablement, provide its blocker, minimum scope, contract/integration evidence, and immediate user-facing slice unlocked.
+- Slice target: consumer, action/input, observable result, and demonstration/evidence.
 - Relevant code paths and repo context.
 - Approved scope and non-goals.
 - Base SHA for the task.
 - Required verification commands.
 - Instruction to read and follow `references/tdd/workflow.md` before writing implementation code.
 
-Do not make the implementer read the issue to discover its own task. Provide the needed context directly. Implementers should not run `gh` write commands; issue state is the orchestrator's responsibility.
+Do not make the implementer read the issue to discover its own task. Provide the needed context directly. Implementers should not run Linear writes; issue state is the orchestrator's responsibility.
 
 ### 5. Handle implementer status
 
@@ -121,11 +131,14 @@ Never ignore an escalation or force the same retry without changing context, mod
 
 If the work is genuinely blocked, record it on the issue:
 
-```bash
-gh issue edit <N> --remove-label "status:approved" --add-label "status:blocked"
-gh issue comment <N> --body-file "$BLOCKED_NOTE"
-rm -f "$BLOCKED_NOTE"
 ```
+save_comment({
+  "issueId": "<id>",
+  "body": "## Blocked\n<reason>"
+})
+```
+
+Leave the workflow state in In Progress unless the user asks to return the issue to Backlog.
 
 ### 6. Run spec compliance review
 
@@ -133,12 +146,12 @@ After implementation, dispatch a spec compliance reviewer using `references/spec
 
 The reviewer must inspect actual code and compare it to:
 
-- The issue body (give the reviewer the issue number so it can run `gh issue view <N>`).
+- The issue body (give the reviewer the identifier so it can run `get_issue`).
 - Task text.
 - Acceptance criteria.
-- Slice target: consumer, action/input, observable result, and demonstration/evidence, or the approved technical-enablement exception.
+- Slice target.
 - Non-goals.
-- Approved deviations recorded in issue comments.
+- Approved deviations recorded in Linear comments.
 
 If the reviewer finds issues, send the task back to the implementer. Re-run spec compliance review after fixes. Do not proceed to code quality review until spec compliance passes.
 
@@ -146,17 +159,7 @@ If the reviewer finds issues, send the task back to the implementer. Re-run spec
 
 After spec compliance passes, dispatch a code quality reviewer using `references/code-quality-reviewer-prompt.md`. Prefer a compatible installed code-review skill when available; otherwise use the compact rubric in `references/code-reviewer.md`.
 
-Provide:
-
-- Task summary.
-- Issue number and task ID.
-- Base SHA before task.
-- Head SHA after implementation.
-- Test evidence.
-- Slice target: consumer, action/input, observable result, and demonstration/evidence, or the approved technical-enablement exception.
-- Approved deviations.
-
-If the reviewer finds Critical or Important issues, send them back to the implementer and re-run code quality review after fixes. Do not mark the task complete while review issues remain open.
+If the reviewer finds Critical or Important issues, send them back to the implementer and re-run code quality review after fixes.
 
 ### 8. Complete the task
 
@@ -166,9 +169,9 @@ A task is complete only when:
 - Required tests and verification commands pass.
 - Spec compliance review passes.
 - Code quality review passes.
-- Concerns and approved deviations are recorded as issue comments.
+- Concerns and approved deviations are recorded as Linear comments.
 
-Commit after each coherent task when project instructions require commits or the user requested commits. Stage only files changed for that task. Reference the issue in the commit body (`Refs #<N>`), not in the subject line.
+Commit after each coherent task when project instructions require commits or the user requested commits. Stage only files changed for that task. Reference the Linear issue identifier in the commit body.
 
 Mark the todo item complete only after the task meets all completion criteria.
 
@@ -182,7 +185,7 @@ For each task:
 
 1. Read the task text and acceptance criteria.
 2. Read and follow `references/tdd/workflow.md` before writing implementation code.
-3. Implement the smallest end-to-end slice that satisfies the task and reaches the stated public interface. For approved technical enablement, implement only its minimum scope.
+3. Implement the smallest end-to-end slice that satisfies the task and reaches the stated public interface.
 4. Run required verification commands and the documented demonstration or enablement evidence.
 5. Perform a written spec compliance check against the task and non-goals.
 6. Perform a written code quality check using a compatible installed code-review skill or the compact rubric in `references/code-reviewer.md`.
@@ -191,121 +194,114 @@ For each task:
 9. Commit if project instructions or the user require commits.
 10. Mark the todo complete.
 
-Disclose in the Build completion report comment that independent subagent review was unavailable.
+Disclose in the Linear comment that independent subagent review was unavailable.
 
 ## Deviation policy
 
 If repo facts invalidate the spec, pause before changing scope.
-
-Examples:
-
-- A named file or package does not exist.
-- The planned API conflicts with installed library docs.
-- The planned data model conflicts with existing migrations.
-- A task requires credentials, destructive migration, or unrelated refactor not approved in the spec.
 
 When this happens:
 
 1. State the conflict clearly.
 2. Propose the smallest adjustment.
 3. Ask the user to approve the deviation.
-4. Record the approved deviation as an issue comment starting with `## Approved deviation`.
-5. Edit the issue body when the decision changes scope, acceptance criteria, task order, or verification. Acceptance criteria changes require the user's explicit approval, since Verify tests against them.
+4. Record the approved deviation as a Linear comment starting with `## Approved deviation`.
+5. Edit the issue description when the decision changes scope, acceptance criteria, task order, or verification. Acceptance criteria changes require the user's explicit approval.
 
 Do not silently implement a different spec.
 
-## Final review
+## Pre-merge acceptance
 
-After all tasks pass their per-task gates:
+After all tasks pass their per-task gates, prove the work on the branch before the PR is ready.
 
 1. Capture final head SHA.
 2. Run the full verification command set from the issue, including the checked-in public-boundary E2E test for a user-facing slice or contract test for approved technical enablement.
-3. Exercise the issue's `## Demonstration` through the public interface. If a project-local `verify-*` skill exists, use it for the demonstration path. For an approved technical-enablement exception, run the documented contract/integration check proving the next slice can consume it.
-4. Dispatch or perform a final whole-branch review against the issue body.
-5. Fix final-review issues.
-6. Re-run final review until no blocking issues remain.
+3. **Look for a project-local `verify-*` skill first** (slash form `/verify-<app>`). If found, read that `SKILL.md` completely and use its Launch, Doctor, Drive, Evidence, and Cleanup sections.
+4. Read `references/user-acceptance/workflow.md` completely and follow it. Use scripts under `scripts/user-acceptance/`. Map verify-* artifacts into that layout when practical.
+5. If none found, drive the app with the bundled user-acceptance playbooks only. Do not generate a verification skill during Build.
+6. Exercise the issue's `## Demonstration` through the public interface.
+7. Dispatch or perform a final whole-branch review against the issue body.
+8. For this repository, run `.cursor/skills/verify-plan-build-verify/` (launch, doctor, four drives, cleanup) against isolated installed candidates **before** opening the implementing PR. Keep evidence under `uat-evidence/`.
 
-## Push the branch
+## Open a draft pull request
 
-Push the branch so the work is durable, but **do not open the pull request**. Verify owns PR creation, because the PR body carries the acceptance-criteria matrix and opening it starts the CI convergence loop.
+Push the branch, then open a **draft** PR while the issue is In Progress.
 
 ```bash
 git push -u origin <branch>
 ```
 
-## Build completion report
-
-Post the report as a comment on the issue:
-
 ```bash
-REPORT="$(mktemp "${TMPDIR:-/tmp}/pbv-report.XXXXXX.md")"
-# write the report to "$REPORT"
-gh issue comment <N> --body-file "$REPORT"
-rm -f "$REPORT"
+PR_BODY="$(mktemp "${TMPDIR:-/tmp}/pbv-pr.XXXXXX.md")"
+# write the PR body to "$PR_BODY"
+gh pr create --draft \
+  --base <default-branch> \
+  --head <branch> \
+  --title "<Linear issue id>: <issue title>" \
+  --body-file "$PR_BODY"
+rm -f "$PR_BODY"
 ```
 
-Start the comment with `## Build completion report` and include:
+The PR title or body must name exactly one distinct Linear issue identifier. The body must contain the acceptance-criteria matrix, scope, tasks completed, approved deviations, verification commands run, and a pointer to the Linear issue.
 
-- Issue number and, for sub-issues, the parent.
-- Branch name, base SHA, and final head SHA.
-- Tasks completed.
-- Files changed.
-- Tests and verification commands run, with the required E2E/contract result called out explicitly.
-- Demonstration exercised and its observable result, or the approved technical-enablement evidence.
-- Review gates completed.
-- Approved deviations, with links to their comments.
-- Known follow-up issues, with links if they were opened.
-- Whether independent subagent review was used.
-- Branch name and pushed head SHA. There is no PR yet; Verify opens it.
+Retain scratch or follow-up issue IDs in a linked evidence artifact when needed so this PR names only its own issue.
 
-Then move the issue to implemented:
+Draft PR open may move the issue to In Progress via integration. Re-read the issue and skip a duplicate In Progress write.
+
+If draft PR creation fails, comment on Linear with the exact ask and stop.
+
+## Record the matrix and mark ready
+
+Post the matrix as a Linear comment starting with `## Build: acceptance criteria matrix`. Include criterion, method, result, evidence path, and totals.
+
+Then mark the PR ready:
 
 ```bash
-gh issue edit <N> \
-  --remove-label "status:approved,phase:build" \
-  --add-label "status:implemented"
+gh pr ready
 ```
 
-Update the body's `## Status` section to `Implemented` in the same turn. Do not check off acceptance criteria here; Verify owns that.
+Re-read the issue. If it is already Agent Review, confirm and stop. If it is still In Progress, write Agent Review using the state-write protocol. If it is Human Review, Canceled, or Duplicate, stop.
 
-Do not close the issue. Verify closes it, or the merged PR closes it and Verify records acceptance before or immediately after the merge.
+```
+get_issue({ "id": "<id>", "includeRelations": true })
+save_issue({ "id": "<id>", "state": "Agent Review" })
+```
+
+Stop. Review owns Agent Review landing. Verify starts after Done.
 
 ## Epic rollup
 
-When the built issue is a sub-issue:
+When the built issue is a child:
 
-1. Comment on the parent with a one-line status and a link to the child's Build completion report.
-2. Leave the parent at `status:approved` until every child is `status:verified` and the parent's own acceptance criteria pass.
+1. Comment on the parent with a one-line status and a link to the child's matrix comment.
+2. Leave the parent in its current state. Parent auto-close is not evidence that code merged or AC landed.
 
-Do not pick the next sibling here. This child still has to pass Verify, and a sibling that starts before that may build on work that fails acceptance. Verify advances the epic after signoff (Step 10 of `references/verify.md`).
+Do not pick the next sibling here. This child still has to pass Review, merge, and Verify.
 
 ## Follow-up work
 
-When Build surfaces work that is out of scope, open a separate issue rather than expanding the current one:
+When Build surfaces work that is out of scope, open a separate Backlog issue:
 
-```bash
-gh issue create --title "<follow-up>" --body-file "$BODY" --label "needs:triage"
-rm -f "$BODY"
+```
+save_issue({
+  "title": "<follow-up>",
+  "team": "<team>",
+  "project": "<project>",
+  "state": "Backlog",
+  "relatedTo": ["<id>"],
+  "description": "<scoped spec, AC, and evidence>"
+})
 ```
 
-Link it from the Build completion report. Triage will groom it into the roadmap.
-
-## Transition to Verify
-
-**Continue directly into Verify. Do not ask permission.** Read `references/verify.md` and follow it in the same session. Build is not a terminal state: an implemented issue with no acceptance evidence and no PR is unfinished work.
-
-Announce the transition, then proceed:
-
-> Build complete for #<N>. Entering Verify: acceptance evidence, PR, then CI convergence.
-
-Stop and hand back to the user instead of continuing only when a Red flag below applies, or when the branch could not be pushed.
+Link it from the matrix comment.
 
 ## Red flags
 
 Stop and ask when:
 
-- The issue is not `status:approved` and the user has not explicitly overridden the gate.
-- The `status:*` label and the body's `## Status` section disagree, including `status:approved` with a Draft body. Both must be approved (or later) before Build writes code.
+- The issue is not Todo or In Progress and the user has not explicitly overridden the gate.
+- The issue is Human Review without an explicit resume.
+- The issue is Canceled or Duplicate.
 - The issue is an epic and no child was selected.
 - Blocking open questions remain.
 - The worktree contains unrelated changes.
@@ -328,3 +324,5 @@ Never:
 - Let implementer self-review replace actual review.
 - Edit acceptance criteria to match what was built.
 - Close the spec issue from Build.
+- Continue into Review or Verify from Build.
+- Merge the pull request.

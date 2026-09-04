@@ -10,8 +10,8 @@ Task tool (general-purpose):
 
     ## Spec
 
-    Spec path: [SPEC_PATH]
-    Spec status: [Approved or explicit override]
+    Spec issue: [LINEAR_ISSUE_ID]
+    Spec state: [Todo, In Progress, or explicit override]
 
     ## Task description
 
@@ -113,7 +113,7 @@ Task tool (general-purpose):
 
     - Status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
     - Task ID:
-    - Spec path:
+    - Spec issue:
     - Base SHA:
     - Head SHA, if changed:
     - What changed:

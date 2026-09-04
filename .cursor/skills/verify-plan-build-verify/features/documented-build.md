@@ -30,5 +30,5 @@ Preconditions:
 ## Gotchas
 
 - `scripts/build.py` wipes `plugins/` before it writes. A dirty hand edit under `plugins/` is lost.
-- `scripts/check.py` with the default git-clean gate fails if generated paths drift from git. Doctor runs that command. Restore generated files from git if you were only proving install copies.
-- Epic #1 still names skill `address-pr-comments`. The trees ship `ship`. Assert `ship`.
+- `scripts/check.py` with the default git-clean gate fails if generated paths drift from git. Doctor runs that command. Run against a committed candidate. Preserve unrelated edits and correct authoring source before regenerating.
+- Assert skill `review`. No `ship` entry point remains.
