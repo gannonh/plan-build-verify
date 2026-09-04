@@ -253,8 +253,7 @@ Use this order:
 5. `Evidence`
 6. `Adversarial Review`
 7. `Manual Run Instructions`
-8. `Recommendation: Pending user sign-off`
-9. `Please reply: accept / reject`
+8. Next step from the owning skill's Linear workflow gate.
 
 Keep the report concise. Link to artifact paths and explain what each artifact proves.
 
@@ -285,8 +284,8 @@ Manual Run Instructions:
 1. <human step or command>
    Expected: <visible result or output>
 
-Recommendation: Pending user sign-off
-Please reply: accept / reject
+Approval and merge permission follow Linear workflow states.
+Follow the owning skill for the next workflow step.
 ```
 
 For UI targets, manual instructions must start with normal user actions in the running app. Put automation commands or test harnesses only in a clearly labeled `Fallback (Engineering Only)` section.
@@ -323,7 +322,7 @@ Before responding, verify:
 - Old-bug negative evidence is saved when validating a fix.
 - Dev servers, native/Electron-type apps, or background processes launched for UAT are cleaned up or explicitly left running for the user.
 - Manual run instructions are included.
-- Recommendation remains `Pending user sign-off` unless the user has accepted.
+- The next step follows the owning skill's Linear workflow gate. Do not add a separate conversational approval gate.
 
 ## Common mistakes
 

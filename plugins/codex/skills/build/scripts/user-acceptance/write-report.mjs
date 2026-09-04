@@ -99,8 +99,8 @@ lines.push('   Expected: the feature path is reachable without setup or launch e
 lines.push('2. Follow the same user path described in the acceptance slices above.');
 lines.push('   Expected: each passing slice reaches the visible or inspectable outcome shown in the evidence.');
 lines.push('');
-lines.push('Recommendation: Pending user sign-off');
-lines.push('Please reply: accept / reject');
+lines.push('Approval and merge permission follow Linear workflow states.');
+lines.push('Follow the owning skill for the next workflow step.');
 lines.push('');
 writeFileSync(reportPath, lines.join('\n'));
 console.log(reportPath);

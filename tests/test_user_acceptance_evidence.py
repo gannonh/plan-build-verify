@@ -121,6 +121,22 @@ def verify(evidence: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
+def test_report_uses_linear_workflow_without_extra_approval_gate(tmp_path: Path) -> None:
+    evidence = create_evidence(tmp_path / "evidence", target="cli", visual=False)
+    result = subprocess.run(
+        ["node", str(SCRIPTS / "write-report.mjs"), "--evidence", str(evidence)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    report = (evidence / "evidence.md").read_text(encoding="utf-8")
+    assert "Linear workflow states" in report
+    assert "accept / reject" not in report
+    assert "Pending user sign-off" not in report
+    assert verify(evidence).returncode == 0
+
+
 def test_visual_evidence_accepts_e2e_checkpoints_and_bounded_video_skip(tmp_path: Path) -> None:
     result = verify(create_evidence(tmp_path / "evidence"))
 
