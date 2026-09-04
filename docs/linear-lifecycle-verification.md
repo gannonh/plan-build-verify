@@ -1,6 +1,6 @@
 # Linear lifecycle verification
 
-Scope: KAT-3233, plugin version 0.2.0. Candidate: `f4ad4423b276a93116ae040c75f03244f57564ac`. Date: 2026-09-04.
+Scope: KAT-3233, plugin version 0.2.0. Candidate: `4e19c85f020656d2119da3e374dadc0562931f5d`. Date: 2026-09-04.
 
 The maintainer waived the live scratch Linear/GitHub workflow demonstration. No scratch team, repo, seeded review thread, or manual test transition was required. This report covers source contracts and isolated installed copies. It does not prove live workflow automation.
 
@@ -19,7 +19,7 @@ python3 scripts/check.py
 plugin trees match src/ and host layout rules
 
 python3 -m pytest
-36 passed in 1.52s
+38 passed in 1.62s
 
 claude plugin validate ./plugins/claude --strict
 Validation passed
@@ -29,7 +29,7 @@ Python 3.11.11 ran in a temporary environment with `requirements-dev.txt`. The f
 
 ## Installed candidates
 
-Run: `20260904T140259-93820`, under `uat-evidence/verify-plan-build-verify/`.
+Run: `20260904T141558-56494`, under `uat-evidence/verify-plan-build-verify/`.
 
 Launch, doctor, and all four drives passed: `cursor-local-install`, `claude-plugin`, `codex-plugin`, and `documented-build`. Strict Claude validation passed on the isolated copy. A second read with `diff -qr` found no differences between each generated tree and its installed copy.
 
@@ -55,13 +55,15 @@ Live Cursor and Claude plugin UI: `verified-unreachable`. The isolated run had n
 
 ## Evidence
 
-The gitignored `uat-evidence/linear-lifecycle-reviewed/` directory holds the evidence manifest, report, and captured command logs with exit codes. The installed-candidate run holds `run.json`, launch/doctor logs, feature results, listings, manifests, and copied command files. Earlier candidate evidence remains in its original directories.
+The gitignored `uat-evidence/linear-lifecycle-pr-fixes/` directory holds the evidence manifest, report, and captured command logs with exit codes. The installed-candidate run holds `run.json`, launch/doctor logs, feature results, listings, manifests, and copied command files. Earlier candidate evidence remains in its original directories.
 
 The independent spec review passed with no blocking findings. Its label-preservation and tool-discovery nits were addressed before the candidate commit. The code-comment audit found no comments to remove.
 
 The Fable code-quality and decision-trail review stopped with HTTP 429 at the monthly usage-credit limit. The user approved GPT-5.6 Sol for the remaining review, recorded in Linear comment `f6c214d4-5ecd-4bfd-b476-b1a0c91df202`.
 
 Sol found two issues: the acceptance evals still expected conversational sign-off, and Verify gave conflicting instructions for a Done issue with no merged PR. Both were corrected with regression coverage. Sol's focused recheck returned `Ready: Yes` for `f4ad442`, with no remaining findings. The evidence validator also passed on that candidate.
+
+The GitHub Codex bot then identified implicit PR selection in Review and an incomplete no-PR exception in Build. Commit `4e19c85` binds Review commands to one repository and PR, checks the checkout's head before edits, and requires draft PR creation before Build continues. Two added contract tests reproduced the failures. Sol's focused recheck returned `Ready: Yes`, with no remaining issue in this delta. The four required commands, four isolated drives, copy equality checks, and evidence validator passed again.
 
 ## Regression evidence
 
@@ -81,9 +83,16 @@ AssertionError: 'No merged PR can be identified' is contained in the stop-and-as
 test_acceptance_evals_use_linear_approval_gate
 AssertionError: 0
 'sign-off' is contained in the first eval's expected output
+
+test_review_commands_keep_the_resolved_pr_target
+AssertionError: view
+The gh pr view example lacked the resolved PR number and repository.
+
+test_build_requires_the_draft_pr_before_ready
+AssertionError: 'merges without PRs' is contained in the Build workflow
 ```
 
-After correction, all 36 tests passed. The report regression executes the public Node command and validates the generated evidence. The other checks protect the instruction and fixture contracts. Sol's trail audit matched the earlier recorded red-green decisions to the transcript.
+After correction, all 38 tests passed. The report regression executes the public Node command and validates the generated evidence. The other checks protect the instruction and fixture contracts. Sol's trail audit matched the earlier recorded red-green decisions to the transcript.
 
 ## Repeat the checks
 
