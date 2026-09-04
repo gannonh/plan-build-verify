@@ -158,7 +158,8 @@ Stop and hand back to the user when:
 - Required credentials, services, or devices are unavailable.
 - Verification would run destructive commands.
 - The worktree has unrelated changes that make evidence unreliable.
-- No merged PR can be identified for the issue.
+
+When an authorized search finds no merged PR for a Done leaf issue, use the failure-comment and Backlog-follow-up path in Step 1. If GitHub access prevents that search, comment with the exact access request and stop.
 
 ## Never
 

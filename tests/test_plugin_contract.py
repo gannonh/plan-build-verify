@@ -195,6 +195,17 @@ def test_verify_starts_after_done_and_keeps_original_done() -> None:
     assert '"state": "Backlog"' in text
     assert "Auto-close is not evidence" in text
     assert "gh pr list --search" in text
+    assert "For a leaf issue with no merged PR naming it, record that failure" in text
+    assert "No merged PR can be identified" not in text.split("## Stop and ask", 1)[1]
+
+
+def test_acceptance_evals_use_linear_approval_gate() -> None:
+    path = ROOT / "src/skills/build/references/user-acceptance/evals/evals.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    for case in payload["evals"]:
+        text = " ".join([case["expected_output"], *case["expectations"]])
+        assert "sign-off" not in text, case["id"]
+        assert "Linear workflow states" in text, case["id"]
 
 
 def test_development_lifecycle_records_kata_sh_policy() -> None:
