@@ -4,21 +4,27 @@ Plan, Build, Review, and Verify as a Cursor, Claude Code, and Codex plugin. Spec
 
 Project: [Plan Build Verify](https://linear.app/kata-sh/project/plan-build-verify-415bb335f84b). Import historical GitHub issues with Linear's native importer.
 
-Cursor and Claude marketplace listings are submitted but not public yet. Use the install steps below until live listing URLs are available.
-
 ## Install
 
 ### Cursor
 
-Copy the generated Cursor tree into the local plugin directory:
+Register this repository as a plugin marketplace:
 
-```bash
-cp -R plugins/cursor ~/.cursor/plugins/local/plan-build-verify
+```shell
+cursor-agent plugin marketplace add https://github.com/gannonh/plan-build-verify
 ```
 
-Enable **Allow Local Plugin Imports**, then enable `plan-build-verify`. The plugin details should list skills `plan`, `build`, `review`, `verify`, and `triage` plus agents `plan-agent`, `build-agent`, and `verify-agent`. Commands `/plan`, `/build`, and `/verify` load the matching skill.
+Install `plan-build-verify` from Cursor plugin settings (**Settings > Plugins**). One install serves the IDE and the CLI. Cursor CLI 2026.09.02 has no `plugin install` subcommand.
 
-The pre-PR check uses an isolated local import. Team marketplace import requires Teams/Enterprise.
+The plugin details should list skills `plan`, `build`, `review`, `verify`, and `triage` plus agents `plan-agent`, `build-agent`, and `verify-agent`. Commands `/plan`, `/build`, and `/verify` load the matching skill.
+
+Update the marketplace index:
+
+```shell
+cursor-agent plugin marketplace update plan-build-verify
+```
+
+Uninstall from the same plugin settings page.
 
 ### Claude Code
 
