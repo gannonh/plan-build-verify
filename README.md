@@ -66,14 +66,14 @@ python3 scripts/build.py
 
 That command writes:
 
-- `plugins/cursor` with `.cursor-plugin/plugin.json`
-- `plugins/claude` with `.claude-plugin/plugin.json`
-- `plugins/codex` with `.codex-plugin/plugin.json`
+- `plugins/cursor` with `.cursor-plugin/plugin.json` and `assets/logo.svg`
+- `plugins/claude` with `.claude-plugin/plugin.json` and `assets/logo.svg`
+- `plugins/codex` with `.codex-plugin/plugin.json` and `assets/logo.svg`
 - `.cursor-plugin/marketplace.json` (`source`: `plugins/cursor`)
 - `.claude-plugin/marketplace.json` (`source`: `./plugins/claude`)
 - `.agents/plugins/marketplace.json` (`source.path`: `./plugins/codex`)
 
-Skill bodies are copied from `src/skills/*/SKILL.md`. Do not edit files under `plugins/` by hand. Bump `version` in `src/manifests/` when skill bodies or generated manifests change. This release is `0.2.0`.
+Skill bodies are copied from `src/skills/*/SKILL.md`. Host manifests come from `src/manifests/{host}/plugin.json`. The logo is copied from `assets/logo.svg`. Do not edit files under `plugins/` by hand. Bump `version` in `src/manifests/` when skill bodies or generated manifests change. This release is `0.2.0`.
 
 ## How CI proves the trees
 

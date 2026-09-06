@@ -25,7 +25,7 @@ Preconditions:
 - **Drive install.** Run `.cursor/skills/verify-plan-build-verify/scripts/control-pbv drive codex-plugin`. Exit code `0`. `evidence/codex-plugin/result.txt` is `ok`.
 - **Skills.** `evidence/codex-plugin/listing.txt` lists skills `build, plan, review, triage, verify`.
 - **Layout.** The same listing says `agents (absent)` and `commands (absent)`. Manifests are `.codex-plugin` only.
-- **Proof.** `evidence/codex-plugin/plugin.json` has `"name": "plan-build-verify"` and `"interface": { "displayName": "Plan Build Verify" }`. Re-read `codex_install` and confirm `.codex-plugin/` contains only `plugin.json`.
+- **Proof.** `evidence/codex-plugin/plugin.json` has `"name": "plan-build-verify"` and `interface.displayName` `Plan Build Verify`. Re-read `codex_install` and confirm `.codex-plugin/` contains only `plugin.json`.
 
 ## Gotchas
 

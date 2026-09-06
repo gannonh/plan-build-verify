@@ -20,6 +20,22 @@
   ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Plan Build Verify"
+    "logo": "./assets/logo.svg",
+    "displayName": "Plan Build Verify",
+    "shortDescription": "Plan, Build, Review, and Verify. Specs live as Linear issues.",
+    "longDescription": "Plan, Build, Review, and Verify as a product OS. Specs live as Linear issues. The plugin ships skills plan, build, review, verify, and triage.",
+    "developerName": "Gannon Hall",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Plan this work as a Linear spec.",
+      "Build the current Linear issue."
+    ],
+    "websiteURL": "https://github.com/gannonh/plan-build-verify",
+    "brandColor": "#0F172A"
   }
 }

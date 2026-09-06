@@ -83,6 +83,7 @@ def emit_host(host: str) -> Path:
     if host in {"cursor", "claude"}:
         copy_tree(SRC / "agents" / host, dest / "agents")
         copy_tree(SRC / "commands", dest / "commands")
+    copy_tree(ROOT / "assets", dest / "assets")
     return dest
 
 

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Plan Build Verify">
+  <rect width="512" height="512" fill="#0F172A"/>
+  <g fill="#FFFFFF">
+    <rect x="156" y="144" width="200" height="48" rx="8"/>
+    <rect x="126" y="232" width="260" height="48" rx="8"/>
+    <rect x="96" y="320" width="320" height="48" rx="8"/>
+  </g>
+</svg>

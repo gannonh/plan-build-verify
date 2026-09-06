@@ -10,6 +10,7 @@
   "homepage": "https://github.com/gannonh/plan-build-verify",
   "repository": "https://github.com/gannonh/plan-build-verify",
   "license": "MIT",
+  "logo": "assets/logo.svg",
   "keywords": [
     "plan",
     "build",

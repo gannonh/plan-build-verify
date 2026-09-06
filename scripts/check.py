@@ -130,6 +130,11 @@ def collect_errors(root: Path = ROOT, *, require_git_clean: bool = True) -> list
             interface = manifest.get("interface")
             if not isinstance(interface, dict) or interface.get("displayName") != "Plan Build Verify":
                 errors.append(f"{path.relative_to(root)}: Codex interface.displayName must be Plan Build Verify")
+            if not isinstance(interface, dict) or not isinstance(interface.get("shortDescription"), str):
+                errors.append(f"{path.relative_to(root)}: Codex interface.shortDescription is required")
+            logo = interface.get("logo") if isinstance(interface, dict) else None
+            if not isinstance(logo, str) or not (path.parent.parent / logo).is_file():
+                errors.append(f"{path.relative_to(root)}: interface.logo must resolve to a file under the plugin root")
             if "hooks" in manifest:
                 errors.append(f"{path.relative_to(root)}: v1 ships no hooks field")
         else:
@@ -138,6 +143,10 @@ def collect_errors(root: Path = ROOT, *, require_git_clean: bool = True) -> list
                 errors.append(f"{path.relative_to(root)}: author must be an object with name and email")
             if "interface" in manifest:
                 errors.append(f"{path.relative_to(root)}: Cursor/Claude manifests must not include Codex interface")
+            if host == "cursor":
+                logo = manifest.get("logo")
+                if not isinstance(logo, str) or not (path.parent.parent / logo).is_file():
+                    errors.append(f"{path.relative_to(root)}: logo must resolve to a file under the plugin root")
             for key in ("skills", "agents", "commands"):
                 rel = manifest.get(key)
                 values = [rel] if isinstance(rel, str) else rel if isinstance(rel, list) else None
