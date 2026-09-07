@@ -79,7 +79,7 @@ def test_generated_trees_satisfy_host_contract() -> None:
     assert errors == [], "\n".join(errors)
 
 
-def test_each_host_distributes_review_skill_at_version_0_2_0() -> None:
+def test_each_host_distributes_review_skill_at_source_version() -> None:
     for host in HOSTS:
         tree = ROOT / "plugins" / host
         observed = sorted(p.name for p in (tree / "skills").iterdir() if p.is_dir())
@@ -88,14 +88,15 @@ def test_each_host_distributes_review_skill_at_version_0_2_0() -> None:
         frontmatter = (tree / "skills" / "review" / "SKILL.md").read_text(encoding="utf-8")
         assert frontmatter.startswith("---\nname: review\n")
         manifest = json.loads((tree / f".{host}-plugin" / "plugin.json").read_text(encoding="utf-8"))
-        assert manifest["version"] == "0.2.0"
+        source = json.loads((ROOT / "src" / "manifests" / host / "plugin.json").read_text())
+        assert manifest["version"] == source["version"]
 
 
-def test_marketplace_catalogs_are_version_0_2_0() -> None:
-    claude = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
-    assert claude["plugins"][0]["version"] == "0.2.0"
-    cursor = json.loads((ROOT / "plugins" / "cursor" / ".cursor-plugin" / "plugin.json").read_text(encoding="utf-8"))
-    assert cursor["version"] == "0.2.0"
+def test_marketplace_catalogs_match_source_versions() -> None:
+    for host, directory in (("claude", ".claude-plugin"), ("cursor", ".cursor-plugin"), ("codex", ".agents/plugins")):
+        source = json.loads((ROOT / "src" / "manifests" / host / "marketplace.json").read_text())
+        generated = json.loads((ROOT / directory / "marketplace.json").read_text())
+        assert generated == source
 
 
 def test_obsolete_migrate_and_ship_paths_are_gone() -> None:
