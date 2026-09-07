@@ -6,51 +6,67 @@ Project: [Plan Build Verify](https://linear.app/kata-sh/project/plan-build-verif
 
 ## Install
 
+You need a current Cursor, Claude Code, or Codex installation and a connected Linear integration. The plugin provides `plan`, `build`, `review`, `verify`, and `triage` skills.
+
 ### Cursor
 
-Register this repository as a plugin marketplace:
+Install:
 
 ```shell
 cursor-agent plugin marketplace add https://github.com/gannonh/plan-build-verify
 ```
 
-Install `plan-build-verify` from Cursor plugin settings (**Settings > Plugins**). One install serves the IDE and the CLI. Cursor CLI 2026.09.02 has no `plugin install` subcommand.
+Then install `plan-build-verify` from **Settings > Plugins**.
 
-The plugin details should list skills `plan`, `build`, `review`, `verify`, and `triage` plus agents `plan-agent`, `build-agent`, and `verify-agent`. Commands `/plan`, `/build`, and `/verify` load the matching skill.
-
-Update the marketplace index:
+Update:
 
 ```shell
 cursor-agent plugin marketplace update plan-build-verify
 ```
 
-Uninstall from the same plugin settings page.
-
 ### Claude Code
 
+Run these commands inside Claude Code:
+
 ```text
+/plugin marketplace add gannonh/plan-build-verify
+/plugin install plan-build-verify@plan-build-verify
+/reload-plugins
+```
+
+Or from your shell:
+
+```shell
 claude plugin marketplace add gannonh/plan-build-verify
 claude plugin install plan-build-verify@plan-build-verify
 ```
 
-Claude should surface the same five skills and three agents. `/plan`, `/build`, and `/verify` load the matching skill.
+The shell path has no reload step. The plugin loads when the next Claude Code session starts.
 
 ### Codex
 
-```text
+Install:
+
+```shell
 codex plugin marketplace add gannonh/plan-build-verify
 codex plugin add plan-build-verify@plan-build-verify
 ```
 
-Codex binds `.agents/plugins/marketplace.json` first, so the installed tree is `plugins/codex`. That tree ships skills `plan`, `build`, `review`, `verify`, and `triage`. It has no `agents/` or `commands/` directory.
+Update:
 
-If a sparse checkout is used, it must be:
-
-```text
---sparse .agents/plugins --sparse plugins/codex
+```shell
+codex plugin marketplace upgrade plan-build-verify
+codex plugin add plan-build-verify@plan-build-verify
 ```
 
-Do not use `--sparse .agents/plugins` alone. That omits `plugins/codex`.
+Turn on Codex subagents in `~/.codex/config.toml` so Build can dispatch implementers and independent reviewers:
+
+```toml
+[features]
+multi_agent = true
+```
+
+Start a new Codex task after install or upgrade so it can discover the skills and setting.
 
 ## Runtime dependency
 
