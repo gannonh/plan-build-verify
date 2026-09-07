@@ -143,7 +143,9 @@ def test_shared_conventions_encode_linear_lifecycle_gates() -> None:
     assert "save_comment({" in text
     assert "list_issue_statuses({" in text
     assert "gitBranchName" in text
-    assert "docs/development-lifecycle.md" in text
+    assert "Missing automation documentation does not block work." in text
+    assert "no separate automation record or maintainer screenshot is required" in text
+    assert "requires a current maintainer screenshot" not in text
     assert "## Status" not in text.split("## Spec issue body template", 1)[1]
 
 

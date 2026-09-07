@@ -1,6 +1,6 @@
 # plan-build-verify
 
-Plan, Build, Review, and Verify as a Cursor, Claude Code, and Codex plugin. Specs live in Linear. GitHub Issues are inbound reports. This repository is the canonical source for plugin version **0.2.0**.
+Plan, Build, Review, and Verify as a Cursor, Claude Code, and Codex plugin. Specs live in Linear. GitHub Issues are inbound reports. This repository is the canonical plugin source. The current version is recorded in `src/manifests/claude/plugin.json`.
 
 Project: [Plan Build Verify](https://linear.app/kata-sh/project/plan-build-verify-415bb335f84b). Import historical GitHub issues with Linear's native importer.
 
@@ -73,7 +73,7 @@ That command writes:
 - `.claude-plugin/marketplace.json` (`source`: `./plugins/claude`)
 - `.agents/plugins/marketplace.json` (`source.path`: `./plugins/codex`)
 
-Skill bodies are copied from `src/skills/*/SKILL.md`. Host manifests come from `src/manifests/{host}/plugin.json`. The logo is copied from `assets/logo.svg`. Do not edit files under `plugins/` by hand. Bump `version` in `src/manifests/` when skill bodies or generated manifests change. This release is `0.2.0`.
+Skill bodies are copied from `src/skills/*/SKILL.md`. Host manifests come from `src/manifests/{host}/plugin.json`. The logo is copied from `assets/logo.svg`. Do not edit files under `plugins/` by hand. Use the Release workflow to bump versions and publish changes.
 
 ## How CI proves the trees
 
@@ -101,3 +101,9 @@ Ported pack unit tests cover user-acceptance evidence scripts and generated-tree
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Publishing
+
+Run **Actions → Release → Run workflow** on `main`. Leave `version` empty for a patch bump, or supply a higher `X.Y.Z` version. The workflow validates the current plugin, updates source manifest versions together, regenerates all host outputs, runs tests and Claude validation, and commits the release. It then pushes the commit and tag atomically and creates a GitHub release with generated notes. Publishing uses `GITHUB_TOKEN` with `contents: write`; repository rules must permit the workflow to push to `main`. No npm package is published.
+
+To preview the next version locally, run `python3 scripts/release_version.py`. Adding `--requested X.Y.Z --apply` updates source manifests; follow it with `python3 scripts/build.py`.

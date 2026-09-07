@@ -66,9 +66,9 @@ Run once per session before the first Linear write.
 
 1. **GitHub repo.** `gh auth status` and `gh repo view --json nameWithOwner,defaultBranchRef`. Record `<owner>/<repo>` and the default branch.
 2. **Linear MCP.** Confirm the host exposes `list_teams`, `get_team`, `list_projects`, `get_issue`, `save_issue`, `save_comment`, `list_comments`, `list_issues`, and `list_issue_statuses`. Stop if any of those are missing. Call `list_issue_labels` and `create_issue_label` only when applying optional hygiene labels.
-3. **Team and project.** Read the project's automation record (see below). Resolve the team through `list_teams` / `get_team` and the project through `list_projects`. Scope discovery queries and issue creation to those resolved identifiers. Updates use the existing issue ID and preserve its team and project.
+3. **Team and project.** Resolve the team through `list_teams` / `get_team` and the project through `list_projects`. Scope discovery queries and issue creation to those resolved identifiers. Updates use the existing issue ID and preserve its team and project.
 4. **Required states.** Call `list_issue_statuses` with `{ "team": "<team>" }`. Resolve IDs for Backlog, Todo, In Progress, Agent Review, Human Review, Merging, Done, Canceled, and Duplicate. Stop if any name is missing.
-5. **Automation ownership.** Load the recorded event-to-state mappings. A missing record, or a live transition that conflicts with the record, requires a current maintainer screenshot or equivalent confirmation before dependent actions. Do not ask the user to reconfirm unchanged settings on every invocation.
+5. **Project lifecycle.** Read the target project's AGENTS.md or equivalent lifecycle instructions and follow its approval gates. Automation settings documented there are sufficient; no separate automation record or maintainer screenshot is required. Missing automation documentation does not block work. See Automation policy for handling actual state transitions.
 6. **Issue graph.** For the issue in scope, call `get_issue` with `{ "id": "<id>", "includeRelations": true }`. Record parent, children, `blockedBy`, `blocks`, and `gitBranchName`.
 
 ## Linear MCP tools
@@ -162,21 +162,13 @@ For a label update, read the current labels and supply the complete intended lab
 
 ## Automation policy
 
-Record each project's PR automation in an existing process document under `docs/`, or in `docs/development-lifecycle.md` when none exists. Record the team, event-to-state mappings, branch-specific rules, verification date, and the maintainer who supplied or confirmed the settings.
+The target project's AGENTS.md or equivalent lifecycle instructions govern approval and phase transitions. Documented GitHub integration settings are useful context, not a prerequisite for Build or other work. Do not require a separate automation record, screenshot, or reconfirmation of settings. Do not assume this plugin repository's integration settings apply to another project.
 
-This repository's record is `docs/development-lifecycle.md` (Kata-sh, Gannon Hall, 2026-09-04). Other projects record their own settings.
+Before every state write, read the current Linear issue. After a GitHub action, re-read the issue: if the authorized transition already happened, skip the write. Otherwise, perform only the transition authorized by the project lifecycle and the completed phase gates. For example, if marking a PR ready leaves the issue In Progress, Build may move it to Agent Review after its gates pass.
 
-For this repository the integration owns:
+An unexpected transition is not permission to overwrite the current state. Follow the state-write protocol below and the project's stand-down rules. Pause the affected action only when the observed state conflicts with an authorized transition and existing instructions or user authorization cannot resolve it. Report the observed state, intended action, and exact decision needed. Missing automation documentation alone is never such a conflict.
 
-- Draft PR open moves the issue to In Progress.
-- PR open moves it to Agent Review.
-- PR review request or activity performs no action.
-- PR ready for merge performs no action.
-- PR merge moves it to Done.
-
-No branch-specific rules are configured. Parent issues auto-close when their last sub-issue closes. Sub-issues do not auto-close with their parent. Stale issues move to Canceled after six months. Closed items auto-archive after six months.
-
-After a GitHub event, read the issue before any state write. Confirm an integration-owned transition when observed. If draft readiness leaves the issue in In Progress, Build performs In Progress to Agent Review after its gates pass. Never move a paused Human Review issue back to Agent Review. Do not configure automation into Human Review or Merging.
+Automatic closure of a parent does not prove its acceptance criteria passed. Preserve human approval gates regardless of integration behavior; never configure automation into Human Review or Merging.
 
 ## Workflow states
 
